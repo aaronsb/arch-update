@@ -25,20 +25,6 @@ SYNC_ICON='󰁪' # nf-md-sync
 TOTAL_STAGES=6
 CURRENT_STAGE=0
 
-# Helper functions
-print_progress() {
-    CURRENT_STAGE=$((CURRENT_STAGE + 1))
-    PROGRESS=$((CURRENT_STAGE * 100 / TOTAL_STAGES))
-    BAR_WIDTH=50
-    FILLED_WIDTH=$((BAR_WIDTH * PROGRESS / 100))
-    EMPTY_WIDTH=$((BAR_WIDTH - FILLED_WIDTH))
-    
-    printf "\n${BLUE}[Stage %d/%d]${NC} %s\n" "$CURRENT_STAGE" "$TOTAL_STAGES" "$1"
-    printf "${CYAN}[${NC}"
-    printf "%${FILLED_WIDTH}s" | tr ' ' '█'
-    printf "%${EMPTY_WIDTH}s" | tr ' ' '░'
-    printf "${CYAN}]${NC} ${BOLD}%d%%${NC}\n\n" "$PROGRESS"
-}
 
 print_header() {
     echo -e "\n${BLUE}${BOLD}════════════════════════════════════════════════════════════════${NC}"
@@ -155,10 +141,6 @@ else
     print_error "Error updating oh-my-posh"
 fi
 
-# Run fastfetch
-print_header "${INFO_ICON} SYSTEM INFORMATION"
-fastfetch
-
 print_header "${CLOCK_ICON} SYSTEM UPDATE COMPLETED AT $(date)"
 
 # Final status
@@ -167,3 +149,8 @@ print_status "${INFO_ICON}" "Please review the log for any potential issues"
 
 # Kill the background sudo refresh process
 kill $SUDO_REFRESH_PID
+
+
+# Run fastfetch
+print_header "${INFO_ICON} SYSTEM INFORMATION"
+fastfetch

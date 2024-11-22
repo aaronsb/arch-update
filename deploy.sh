@@ -17,7 +17,7 @@ echo -e "\n${BLUE}${BOLD}══════════════════�
 echo -e "${CYAN}${BOLD} ${INSTALL_ICON} INSTALLING SYSTEM UPDATE SCRIPT ${NC}"
 echo -e "${BLUE}${BOLD}════════════════════════════════════════════════${NC}\n"
 
-# Installation
+# Installation of update-arch script
 echo -e "${CYAN}${INSTALL_ICON} Installing ${BOLD}update-arch${NC} to ${BOLD}/usr/local/bin${NC}..."
 if sudo cp ./update.sh /usr/local/bin/update-arch && sudo chmod +x /usr/local/bin/update-arch; then
     echo -e "${GREEN}${SUCCESS_ICON} Installation successful${NC}"
