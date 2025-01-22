@@ -1,0 +1,58 @@
+#!/bin/bash
+#
+# Flatpak Updates (20-29 priority range)
+# Handles updating of Flatpak packages if installed
+
+# Source utils if not already sourced
+if ! command -v print_header &>/dev/null; then
+    source "$(dirname "$(dirname "$(readlink -f "$0")")")/utils.sh"
+fi
+
+# Check if this module can run
+check_supported() {
+    command -v flatpak &>/dev/null
+    return $?
+}
+
+# Run the update process
+run_update() {
+    print_header "${PACKAGE_ICON} UPDATING FLATPAK PACKAGES"
+    
+    # Check if any Flatpak packages are installed
+    if ! flatpak list | grep -q .; then
+        print_success "No Flatpak packages installed"
+        return 0
+    fi
+    
+    # List current updates
+    print_status "${SYNC_ICON}" "Checking for Flatpak updates..."
+    local updates=$(flatpak remote-ls --updates)
+    if [ -z "$updates" ]; then
+        print_success "All Flatpak packages are up to date"
+        return 0
+    fi
+    
+    # Show available updates
+    print_status "${PACKAGE_ICON}" "Updates available:"
+    echo "$updates"
+    
+    # Perform update
+    print_status "${SYNC_ICON}" "Updating Flatpak packages..."
+    if ! flatpak update -y; then
+        print_error "Failed to update Flatpak packages"
+        return 1
+    fi
+    
+    print_success "Flatpak packages updated successfully"
+    return 0
+}
+
+# If script is run directly, check support and run
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    if check_supported; then
+        run_update
+    else
+        echo "Module requirements not met"
+        exit 1
+    fi
+fi

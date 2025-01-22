@@ -7,7 +7,6 @@
 SCRIPT_DIR="$(dirname "$(readlink -f "$0")")"
 source "$SCRIPT_DIR/utils.sh"
 source "$SCRIPT_DIR/system-check.sh"
-source "$SCRIPT_DIR/package-update.sh"
 source "$SCRIPT_DIR/log-manage.sh"
 
 # Constants
@@ -45,28 +44,6 @@ main() {
         print_error "System health checks failed"
         kill $SUDO_REFRESH_PID
         exit 1
-    fi
-    
-    # Update packages
-    if ! update_packages; then
-        print_error "Package updates failed"
-        kill $SUDO_REFRESH_PID
-        exit 1
-    fi
-    
-    # Update Flatpak if installed
-    if command -v flatpak &>/dev/null; then
-        print_header "${PACKAGE_ICON} UPDATING FLATPAK PACKAGES"
-        if flatpak list | grep -q .; then
-            print_status "${SYNC_ICON}" "Updating Flatpak packages..."
-            if ! flatpak update -y; then
-                print_warning "Failed to update Flatpak packages"
-            else
-                print_success "Flatpak packages updated successfully"
-            fi
-        else
-            print_success "No Flatpak packages installed"
-        fi
     fi
     
     # Run enabled modules
