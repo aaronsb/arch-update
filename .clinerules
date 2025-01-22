@@ -8,6 +8,12 @@
 - Current version: 0.1.0 (pre-release)
 
 ## Git Practices
+- Commit at functional stopping points:
+  - When a feature/fix is working and tested
+  - Before starting major changes
+  - When reaching a stable state
+  - After successful testing sessions
+  - Before experimental modifications
 - Use semantic commit messages:
   - feat: (new feature)
   - fix: (bug fix)
@@ -16,9 +22,15 @@
   - refactor: (refactoring code)
   - test: (adding tests)
   - chore: (maintenance)
+  - stable: (marking a functional stopping point)
 - Tag versions when stable:
   - v1.0.0 for first stable release
   - Include release notes in tag message
+- Protect working code:
+  - Always commit before major refactoring
+  - Create branches for experimental changes
+  - Use descriptive commit messages to mark stable points
+  - Consider tagging significant stable states
 
 ## Code Style
 - Indentation: 4 spaces
