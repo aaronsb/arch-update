@@ -10,7 +10,7 @@ source "$SCRIPT_DIR/system-check.sh"
 source "$SCRIPT_DIR/log-manage.sh"
 
 # Constants
-VERSION="0.1.0"
+VERSION="0.2.0"
 
 # Icons for privilege levels
 SUDO_ICON="🔐"
