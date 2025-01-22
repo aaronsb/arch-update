@@ -1,156 +1,93 @@
 #!/bin/bash
 
-# Color definitions
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-MAGENTA='\033[0;35m'
-CYAN='\033[0;36m'
-NC='\033[0m' # No Color
-BOLD='\033[1m'
+source ./utils.sh
+source ./system-check.sh
+source ./package-update.sh
+source ./log-manage.sh
 
-# Icons (nerdfonts)
-INFO_ICON='' # nf-fa-info_circle
-SUCCESS_ICON='' # nf-fa-check
-WARNING_ICON='' # nf-fa-warning
-ERROR_ICON='' # nf-fa-times_circle
-PACKAGE_ICON='' # nf-fa-cube
-TRASH_ICON='' # nf-fa-trash
-CLOCK_ICON='' # nf-fa-clock_o
-LOG_ICON='' # nf-fa-file_text
-SYNC_ICON='󰁪' # nf-md-sync
+# Set up error handling
+set_error_handlers
 
-# Progress tracking
-TOTAL_STAGES=6
-CURRENT_STAGE=0
-
-
-print_header() {
-    echo -e "\n${BLUE}${BOLD}════════════════════════════════════════════════════════════════${NC}"
-    echo -e "${CYAN}${BOLD} $1 ${NC}"
-    echo -e "${BLUE}${BOLD}════════════════════════════════════════════════════════════════${NC}\n"
-}
-
-print_status() {
-    echo -e "${CYAN}$1 ${NC}$2"
-}
-
-print_success() {
-    echo -e "${GREEN}${SUCCESS_ICON} $1${NC}"
-}
-
-print_warning() {
-    echo -e "${YELLOW}${WARNING_ICON} $1${NC}"
-}
-
-print_error() {
-    echo -e "${RED}${ERROR_ICON} $1${NC}"
-}
-
-# Establish sudo rights
-sudo -v
-
-# Define the log file location
-LOGFILE="/var/log/system_update_$(date +'%Y%m%d_%H%M%S').log"
-
-# Create the log file
-print_status "${LOG_ICON}" "Creating new log file: ${BOLD}$LOGFILE${NC}"
-
-sudo touch "$LOGFILE"
-if [ $? -ne 0 ]; then
-    print_error "Failed to create log file: $LOGFILE"
-    exit 1
-fi
-
-# Log the entire script's output
-exec > >(sudo tee -a "$LOGFILE") 2>&1
-
-# Keep sudo session alive
-( while true; do sudo -v; sleep 60; done; ) &
-SUDO_REFRESH_PID=$!
-
-print_header "${CLOCK_ICON} SYSTEM UPDATE STARTED AT $(date)"
-
-# System update via yay (handles both official and AUR packages)
-print_progress "Updating System Packages"
-print_header "${PACKAGE_ICON} UPDATING SYSTEM AND AUR PACKAGES"
-print_status "${SYNC_ICON}" "Running system update..."
-if yay -Syu --noconfirm --color=always; then
-    print_success "System and AUR packages updated successfully"
-else
-    print_error "Error updating packages"
-fi
-
-# Remove orphaned packages
-print_progress "Checking Orphaned Packages"
-print_header "${TRASH_ICON} CHECKING FOR ORPHANED PACKAGES"
-orphans=$(pacman -Qdtq)
-if [[ ! -z $orphans ]]; then
-    print_warning "Found orphaned packages. Removing..."
-    if sudo pacman -Rns $orphans --noconfirm; then
-        print_success "Orphaned packages removed successfully"
-    else
-        print_error "Error removing orphaned packages"
+main() {
+    print_header "${CLOCK_ICON} SYSTEM UPDATE STARTED AT $(date)"
+    
+    # Initialize logging
+    local LOGFILE=$(manage_logs)
+    if [ -z "$LOGFILE" ]; then
+        print_error "Failed to initialize logging"
+        exit 1
     fi
-else
-    print_success "No orphaned packages found"
-fi
-
-# Clean package cache
-print_progress "Cleaning Package Cache"
-print_header "${TRASH_ICON} CLEANING PACKAGE CACHE"
-print_status "${SYNC_ICON}" "Cleaning package cache (keeping last 3 versions)..."
-if sudo paccache -r; then
-    print_success "Package cache cleaned successfully"
-else
-    print_error "Error cleaning package cache"
-fi
-
-# Update Flatpak packages
-print_progress "Updating Flatpak Packages"
-print_header "${PACKAGE_ICON} CHECKING FLATPAK PACKAGES"
-flatpaklist=$(flatpak list)
-if [[ -n "$flatpaklist" ]]; then
-    print_status "${SYNC_ICON}" "Updating Flatpak packages..."
-    if flatpak update -y; then
-        print_success "Flatpak packages updated successfully"
-    else
-        print_error "Error updating Flatpak packages"
+    
+    # Establish sudo session
+    sudo -v
+    if [ $? -ne 0 ]; then
+        print_error "Failed to establish sudo session"
+        exit 1
     fi
-else
-    print_success "No Flatpak packages installed"
-fi
+    
+    # Keep sudo session alive
+    ( while true; do sudo -v; sleep 60; done; ) &
+    SUDO_REFRESH_PID=$!
+    
+    # Redirect output to log file while maintaining console output
+    exec &> >(tee -a "$LOGFILE")
+    
+    # Perform system health checks
+    if ! check_system_health; then
+        print_error "System health checks failed"
+        kill $SUDO_REFRESH_PID
+        exit 1
+    fi
+    
+    # Update packages
+    if ! update_packages; then
+        print_error "Package updates failed"
+        kill $SUDO_REFRESH_PID
+        exit 1
+    fi
+    
+    # Update Flatpak if installed
+    if command -v flatpak &>/dev/null; then
+        print_header "${PACKAGE_ICON} UPDATING FLATPAK PACKAGES"
+        if flatpak list | grep -q .; then
+            print_status "${SYNC_ICON}" "Updating Flatpak packages..."
+            if ! flatpak update -y; then
+                print_warning "Failed to update Flatpak packages"
+            else
+                print_success "Flatpak packages updated successfully"
+            fi
+        else
+            print_success "No Flatpak packages installed"
+        fi
+    fi
+    
+    # Update oh-my-posh if installed
+    if command -v oh-my-posh &>/dev/null; then
+        print_header "${SYNC_ICON} UPDATING OH-MY-POSH"
+        if ! sudo oh-my-posh upgrade; then
+            print_warning "Failed to update oh-my-posh"
+        else
+            print_success "oh-my-posh updated successfully"
+        fi
+    fi
+    
+    print_header "${CLOCK_ICON} SYSTEM UPDATE COMPLETED AT $(date)"
+    
+    # Final status
+    print_status "${LOG_ICON}" "Log saved to: ${BOLD}$LOGFILE${NC}"
+    print_status "${INFO_ICON}" "Please review the log for any potential issues"
+    
+    # Kill the background sudo refresh process
+    kill $SUDO_REFRESH_PID
+    
+    # Run fastfetch if available
+    if command -v fastfetch &>/dev/null; then
+        print_header "${INFO_ICON} SYSTEM INFORMATION"
+        fastfetch
+    fi
+    
+    return 0
+}
 
-# Vacuum system logs
-print_progress "Cleaning System Logs"
-print_header "${TRASH_ICON} CLEANING SYSTEM LOGS"
-print_status "${SYNC_ICON}" "Removing logs older than 2 weeks..."
-if sudo journalctl --vacuum-time=2weeks; then
-    print_success "System logs cleaned successfully"
-else
-    print_error "Error cleaning system logs"
-fi
-
-# Update oh-my-posh
-print_progress "Updating Oh-My-Posh"
-print_header "${SYNC_ICON} UPDATING OH-MY-POSH"
-if sudo oh-my-posh upgrade; then
-    print_success "oh-my-posh updated successfully"
-else
-    print_error "Error updating oh-my-posh"
-fi
-
-print_header "${CLOCK_ICON} SYSTEM UPDATE COMPLETED AT $(date)"
-
-# Final status
-print_status "${LOG_ICON}" "Log saved to: ${BOLD}$LOGFILE${NC}"
-print_status "${INFO_ICON}" "Please review the log for any potential issues"
-
-# Kill the background sudo refresh process
-kill $SUDO_REFRESH_PID
-
-
-# Run fastfetch
-print_header "${INFO_ICON} SYSTEM INFORMATION"
-fastfetch
+# Run main function
+main
