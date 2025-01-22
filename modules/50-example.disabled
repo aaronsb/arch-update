@@ -1,0 +1,37 @@
+#!/bin/bash
+#
+# Example disabled module
+# This is a template for creating new update modules
+
+# Source utils if not already sourced
+if ! command -v print_header &>/dev/null; then
+    source "$(dirname "$(dirname "$(readlink -f "$0")")")/utils.sh"
+fi
+
+# Check if this module can run
+check_supported() {
+    # Example: check if a command exists
+    # command -v some-command &>/dev/null
+    # return $?
+    
+    # For this example, always return true
+    return 0
+}
+
+# Run the update process
+run_update() {
+    print_header "${INFO_ICON} EXAMPLE MODULE"
+    print_status "${INFO_ICON}" "This is an example module"
+    print_status "${INFO_ICON}" "To enable: mv 50-example.disabled 50-example.sh && chmod +x 50-example.sh"
+    return 0
+}
+
+# If script is run directly, check support and run
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    if check_supported; then
+        run_update
+    else
+        echo "Module requirements not met"
+        exit 1
+    fi
+fi

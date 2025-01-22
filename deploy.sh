@@ -48,7 +48,7 @@ check_dependencies() {
 
 # Function to set up installation directories
 create_directories() {
-    mkdir -p "$INSTALL_DIR" "$BIN_DIR"
+    mkdir -p "$INSTALL_DIR" "$BIN_DIR" "$INSTALL_DIR/modules"
     if [[ $? -ne 0 ]]; then
         print_error "Failed to create required directories"
         return 1
@@ -58,9 +58,10 @@ create_directories() {
 
 # Function to install script files
 copy_files() {
-    local files=("update.sh" "system-check.sh" "package-update.sh" "log-manage.sh" "utils.sh")
+    # Copy core scripts
+    local core_files=("update.sh" "system-check.sh" "package-update.sh" "log-manage.sh" "utils.sh")
     
-    for file in "${files[@]}"; do
+    for file in "${core_files[@]}"; do
         if [[ ! -f "$file" ]]; then
             print_error "Required file $file not found"
             return 1
@@ -72,7 +73,19 @@ copy_files() {
         fi
     done
     
-    # Make scripts executable
+    # Copy modules if they exist
+    if [[ -d "modules" ]]; then
+        cp -r modules/* "$INSTALL_DIR/modules/"
+        if [[ $? -ne 0 ]]; then
+            print_error "Failed to copy modules"
+            return 1
+        fi
+        
+        # Make enabled modules (.sh) executable
+        find "$INSTALL_DIR/modules" -name "*.sh" -exec chmod +x {} \;
+    fi
+    
+    # Make core scripts executable
     chmod +x "$INSTALL_DIR"/*.sh
     if [[ $? -ne 0 ]]; then
         print_error "Failed to set executable permissions"

@@ -69,15 +69,25 @@ main() {
         fi
     fi
     
-    # Update oh-my-posh if installed
-    if command -v oh-my-posh &>/dev/null; then
-        print_header "${SYNC_ICON} UPDATING OH-MY-POSH"
-        if ! sudo oh-my-posh upgrade; then
-            print_warning "Failed to update oh-my-posh"
-        else
-            print_success "oh-my-posh updated successfully"
+    # Run enabled modules
+    print_header "${PACKAGE_ICON} RUNNING UPDATE MODULES"
+    
+    # Find and sort enabled modules
+    while IFS= read -r module; do
+        if [[ -x "$module" ]]; then
+            print_status "${INFO_ICON}" "Running module: $(basename "$module")"
+            if ! source "$module"; then
+                print_warning "Module $(basename "$module") failed"
+            fi
+            if ! check_supported; then
+                print_status "${INFO_ICON}" "Module $(basename "$module") not supported on this system"
+                continue
+            fi
+            if ! run_update; then
+                print_warning "Module $(basename "$module") update failed"
+            fi
         fi
-    fi
+    done < <(find "$SCRIPT_DIR/modules" -name "*.sh" | sort)
     
     print_header "${CLOCK_ICON} SYSTEM UPDATE COMPLETED AT $(date)"
     

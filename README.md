@@ -4,7 +4,10 @@ A modular system update script for Arch Linux that follows the Unix philosophy o
 
 ## Features
 
-- **Modular Design**: Split into focused, maintainable components
+- **Modular Design**: 
+  - Split into focused, maintainable components
+  - Extensible module system with priority-based execution
+  - Easy enable/disable via file extensions
 - **Comprehensive System Checks**: Verifies system health before updates
 - **Smart Package Management**: 
   - Supports both official repos and AUR
@@ -71,11 +74,23 @@ The update process will:
 
 ## Components
 
+Core:
 - **update.sh**: Main script orchestrator
 - **system-check.sh**: Pre-update system health verification
 - **package-update.sh**: Package management operations
 - **log-manage.sh**: Log handling and rotation
 - **utils.sh**: Shared functions and utilities
+
+Modules (in modules/):
+- Named with priority prefix like udev rules (e.g., 50-oh-my-posh.sh)
+- Priorities determine execution order:
+  - 10-29: System level updates
+  - 30-49: Package management
+  - 50-79: Application updates
+  - 80-99: Optional/user tools
+- Status controlled by extension:
+  - .sh: Module is enabled
+  - .disabled (or any non-.sh): Module is disabled
 
 ## Dependencies
 
@@ -91,6 +106,33 @@ Optional:
 - flatpak
 - oh-my-posh
 - fastfetch (for system information display)
+
+## Module Management
+
+Enable a module:
+```bash
+mv XX-modulename.disabled XX-modulename.sh && chmod +x XX-modulename.sh
+```
+
+Disable a module:
+```bash
+mv XX-modulename.sh XX-modulename.disabled
+```
+
+Create a new module:
+1. Copy the example module:
+```bash
+cp modules/50-example.disabled modules/XX-yourmodule.sh
+```
+2. Edit the module implementation
+3. Make it executable:
+```bash
+chmod +x modules/XX-yourmodule.sh
+```
+
+Each module must implement:
+- check_supported(): Returns 0 if module can run
+- run_update(): Performs the actual update
 
 ## Logging
 
