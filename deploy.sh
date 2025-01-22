@@ -18,7 +18,7 @@ fi
 INSTALL_DIR="$HOME/.local/share/update-arch"
 BIN_DIR="$HOME/.local/bin"
 SCRIPT_NAME="update-arch"
-REQUIRED_DEPS="bash sudo pacman systemd"
+REQUIRED_DEPS="bash sudo pacman systemctl"
 
 # Function to check dependencies
 check_dependencies() {
