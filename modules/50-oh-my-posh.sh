@@ -3,6 +3,8 @@
 # oh-my-posh update module
 # Updates oh-my-posh if installed
 
+MODULE_TYPE="user"
+
 # Source utils if not already sourced
 if ! command -v print_header &>/dev/null; then
     source "$(dirname "$(dirname "$(readlink -f "$0")")")/utils.sh"

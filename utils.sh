@@ -129,3 +129,18 @@ setup_logging() {
     
     echo "$logfile"
 }
+
+# Module type validation
+validate_module_type() {
+    local module_name="$1"
+    local declared_type="$2"
+    local expected_type="$3"
+    
+    if [[ "$declared_type" != "$expected_type" ]]; then
+        print_error "Module type mismatch in $(basename "$module_name")"
+        print_error "Declared as '$declared_type' but placed in '$expected_type' number range"
+        print_error "Please move module to correct number range or fix type declaration"
+        return 1
+    fi
+    return 0
+}
