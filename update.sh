@@ -1,9 +1,13 @@
 #!/bin/bash
 
-source ./utils.sh
-source ./system-check.sh
-source ./package-update.sh
-source ./log-manage.sh
+# Get the directory where the script is installed
+SCRIPT_DIR="$(dirname "$(readlink -f "$0")")"
+
+# Source companion scripts
+source "$SCRIPT_DIR/utils.sh"
+source "$SCRIPT_DIR/system-check.sh"
+source "$SCRIPT_DIR/package-update.sh"
+source "$SCRIPT_DIR/log-manage.sh"
 
 # Set up error handling
 set_error_handlers
@@ -89,5 +93,55 @@ main() {
     return 0
 }
 
-# Run main function
-main
+# Help text
+show_help() {
+    cat << EOF
+update-arch: Arch Linux System Update Script
+
+Usage: update-arch [OPTIONS]
+
+Options:
+    -h, --help      Show this help message
+    --version       Show version information
+    --dry-run       Show what would be updated without making changes
+
+This script performs system updates and maintenance tasks:
+- System health checks
+- Package updates (official repos and AUR)
+- Orphaned package cleanup
+- Log management
+- Optional Flatpak and oh-my-posh updates
+
+For more information, see: ~/.local/share/update-arch/README.md
+EOF
+}
+
+# Version information
+show_version() {
+    echo "update-arch version 1.0.0"
+}
+
+# Parse command line arguments
+case "$1" in
+    -h|--help)
+        show_help
+        exit 0
+        ;;
+    --version)
+        show_version
+        exit 0
+        ;;
+    --dry-run)
+        # TODO: Implement dry run functionality
+        echo "Dry run functionality not yet implemented"
+        exit 1
+        ;;
+    "")
+        main
+        ;;
+    *)
+        echo "Unknown option: $1"
+        echo "Use --help for usage information"
+        exit 1
+        ;;
+esac
