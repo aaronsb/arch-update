@@ -1,0 +1,57 @@
+#!/bin/bash
+#
+# Example System Module (10-29 priority range)
+# Demonstrates core system maintenance tasks with educational output
+
+# Source utils if not already sourced
+if ! command -v print_header &>/dev/null; then
+    source "$(dirname "$(dirname "$(readlink -f "$0")")")/utils.sh"
+fi
+
+# Check if this module can run
+check_supported() {
+    # Example: check if pacman exists (it should on Arch!)
+    command -v pacman &>/dev/null
+    return $?
+}
+
+# Run the update process
+run_update() {
+    print_header "${INFO_ICON} SYSTEM MAINTENANCE EXAMPLE"
+    
+    # Educational output explaining the task
+    print_status "${INFO_ICON}" "This module demonstrates system maintenance tasks"
+    print_status "${INFO_ICON}" "System modules (10-29) handle core Arch maintenance"
+    
+    # Example of checking package cache
+    print_status "${SYNC_ICON}" "Checking package cache size..."
+    cache_size=$(du -sh /var/cache/pacman/pkg/ 2>/dev/null | cut -f1)
+    
+    # Educational explanation of package cache
+    print_status "${INFO_ICON}" "Package cache at /var/cache/pacman/pkg: ${cache_size}"
+    print_status "${INFO_ICON}" "The package cache stores downloaded packages"
+    print_status "${INFO_ICON}" "Regular cleaning prevents excessive disk usage"
+    print_status "${INFO_ICON}" "Learn more: https://wiki.archlinux.org/title/Pacman#Cleaning_the_package_cache"
+    
+    # Example system check
+    print_status "${SYNC_ICON}" "Verifying system journal..."
+    journal_size=$(journalctl --disk-usage | cut -d: -f2 | tr -d ' ')
+    
+    # Educational explanation of system journal
+    print_status "${INFO_ICON}" "System journal size: ${journal_size}"
+    print_status "${INFO_ICON}" "The journal logs system events and service status"
+    print_status "${INFO_ICON}" "Regular maintenance keeps logs manageable"
+    print_status "${INFO_ICON}" "Learn more: https://wiki.archlinux.org/title/Systemd/Journal"
+    
+    return 0
+}
+
+# If script is run directly, check support and run
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    if check_supported; then
+        run_update
+    else
+        echo "Module requirements not met"
+        exit 1
+    fi
+fi

@@ -82,12 +82,21 @@ Core:
 - **utils.sh**: Shared functions and utilities
 
 Modules (in modules/):
-- Named with priority prefix like udev rules (e.g., 50-oh-my-posh.sh)
-- Priorities determine execution order:
-  - 10-29: System level updates
-  - 30-49: Package management
-  - 50-79: Application updates
-  - 80-99: Optional/user tools
+- Named with priority prefix like udev rules (e.g., 10-pacman.sh)
+- Organized into two main categories:
+  1. System Modules (10-29):
+     - Core system maintenance tasks recommended by Arch Wiki
+     - Educational output explaining each maintenance operation
+     - Examples: package updates, mirror management, system checks
+  2. User Modules (50-79):
+     - User-specific customization maintenance
+     - Detailed output about user-level updates
+     - Examples: oh-my-posh, custom AUR packages, user tools
+
+- Each module provides verbose, educational output to help users:
+  - Understand what maintenance tasks are being performed
+  - Learn system administration best practices
+  - Gain familiarity with Arch Linux maintenance
 - Status controlled by extension:
   - .sh: Module is enabled
   - .disabled (or any non-.sh): Module is disabled
@@ -108,6 +117,21 @@ Optional:
 - fastfetch (for system information display)
 
 ## Module Management
+
+### Module Types
+
+1. System Modules (10-29):
+   - Essential system maintenance tasks
+   - Follow Arch Wiki recommendations
+   - Educational output for learning
+   - Example: 10-pacman.sh, 15-mirrors.sh
+
+2. User Modules (50-79):
+   - User customization maintenance
+   - Personal tool updates
+   - Example: 50-oh-my-posh.sh
+
+### Module Control
 
 Enable a module:
 ```bash
