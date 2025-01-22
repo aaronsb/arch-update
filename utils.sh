@@ -1,14 +1,14 @@
 #!/bin/bash
 
 # Color definitions
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-MAGENTA='\033[0;35m'
-CYAN='\033[0;36m'
-NC='\033[0m' # No Color
-BOLD='\033[1m'
+RED="$(tput setaf 1)"
+GREEN="$(tput setaf 2)"
+YELLOW="$(tput setaf 3)"
+BLUE="$(tput setaf 4)"
+MAGENTA="$(tput setaf 5)"
+CYAN="$(tput setaf 6)"
+NC="$(tput sgr0)" # No Color
+BOLD="$(tput bold)"
 
 # Icons (nerdfonts)
 INFO_ICON='' 
@@ -26,25 +26,25 @@ KEY_ICON=''
 
 # Logging functions
 print_header() {
-    echo -e "\n${BLUE}${BOLD}════════════════════════════════════════════════════════════════${NC}"
-    echo -e "${CYAN}${BOLD} $1 ${NC}"
-    echo -e "${BLUE}${BOLD}════════════════════════════════════════════════════════════════${NC}\n"
+    echo "\n${BLUE}${BOLD}════════════════════════════════════════════════════════════════${NC}"
+    echo "${CYAN}${BOLD} $1 ${NC}"
+    echo "${BLUE}${BOLD}════════════════════════════════════════════════════════════════${NC}\n"
 }
 
 print_status() {
-    echo -e "${CYAN}$1 ${NC}$2"
+    echo "${CYAN}$1 ${NC}$2"
 }
 
 print_success() {
-    echo -e "${GREEN}${SUCCESS_ICON} $1${NC}"
+    echo "${GREEN}${SUCCESS_ICON} $1${NC}"
 }
 
 print_warning() {
-    echo -e "${YELLOW}${WARNING_ICON} $1${NC}"
+    echo "${YELLOW}${WARNING_ICON} $1${NC}"
 }
 
 print_error() {
-    echo -e "${RED}${ERROR_ICON} $1${NC}"
+    echo "${RED}${ERROR_ICON} $1${NC}"
     return 1
 }
 

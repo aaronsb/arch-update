@@ -8,13 +8,13 @@ if [[ -f "./utils.sh" ]]; then
     source ./utils.sh
 else
     # Minimal color definitions if utils.sh not available
-    RED='\033[0;31m'
-    GREEN='\033[0;32m'
-    YELLOW='\033[1;33m'
-    NC='\033[0m'
-    print_error() { echo -e "${RED}ERROR: $1${NC}"; }
-    print_success() { echo -e "${GREEN}SUCCESS: $1${NC}"; }
-    print_warning() { echo -e "${YELLOW}WARNING: $1${NC}"; }
+    RED="$(tput setaf 1)"
+    GREEN="$(tput setaf 2)"
+    YELLOW="$(tput setaf 3)"
+    NC="$(tput sgr0)"
+    print_error() { echo "${RED}ERROR: $1${NC}"; }
+    print_success() { echo "${GREEN}SUCCESS: $1${NC}"; }
+    print_warning() { echo "${YELLOW}WARNING: $1${NC}"; }
 fi
 
 # Constants
@@ -141,8 +141,8 @@ install() {
     local version
     version=$(get_version)
     print_success "Installation of update-arch v${version} complete!"
-    echo -e "You can now run '${GREEN}update-arch${NC}' from anywhere"
-    echo -e "Use '${GREEN}update-arch --help${NC}' to see available options"
+    echo "You can now run '${GREEN}update-arch${NC}' from anywhere"
+    echo "Use '${GREEN}update-arch --help${NC}' to see available options"
     return 0
 }
 
