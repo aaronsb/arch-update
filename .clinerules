@@ -1,0 +1,63 @@
+# Project Rules and Standards
+
+## Version Numbering
+- Follow Semantic Versioning (MAJOR.MINOR.PATCH)
+- MAJOR version for incompatible API changes
+- MINOR version for backwards-compatible functionality
+- PATCH version for backwards-compatible bug fixes
+- Current version: 0.1.0 (pre-release)
+
+## Git Practices
+- Use semantic commit messages:
+  - feat: (new feature)
+  - fix: (bug fix)
+  - docs: (documentation changes)
+  - style: (formatting, etc; no code change)
+  - refactor: (refactoring code)
+  - test: (adding tests)
+  - chore: (maintenance)
+- Tag versions when stable:
+  - v1.0.0 for first stable release
+  - Include release notes in tag message
+
+## Code Style
+- Indentation: 4 spaces
+- Max line length: 80 characters
+- Function names: snake_case
+- Variable names: snake_case
+- Constants: UPPER_CASE
+- Comments: Start with space after #
+- Always use double quotes for strings
+- Always use [[ ]] for conditionals
+
+## Script Structure
+- Start with shebang: #!/bin/bash
+- Follow with brief description
+- Source utils.sh first if needed
+- Define constants
+- Define functions
+- Main logic at bottom
+
+## Documentation
+- Keep README.md up to date
+- Document all functions
+- Include example usage
+- List dependencies
+
+## Error Handling
+- Always check command success
+- Use set -e for critical sections
+- Provide meaningful error messages
+- Clean up on exit
+
+## Testing
+- Test on clean system before release
+- Verify all dependencies
+- Check error conditions
+- Test help/version commands
+
+## Logging
+- Use consistent log format
+- Include timestamps
+- Use appropriate log levels
+- Rotate logs appropriately

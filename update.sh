@@ -117,8 +117,9 @@ EOF
 }
 
 # Version information
+VERSION="0.1.0"
 show_version() {
-    echo "update-arch version 1.0.0"
+    echo "update-arch version $VERSION"
 }
 
 # Parse command line arguments
