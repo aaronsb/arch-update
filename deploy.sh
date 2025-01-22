@@ -1,7 +1,10 @@
 #!/bin/bash
+#
+# Deployment script for update-arch system maintenance tool
+# Handles installation, uninstallation, and version management
 
-# Source utils if available (for local testing)
-if [ -f "./utils.sh" ]; then
+# Source utils.sh first if available
+if [[ -f "./utils.sh" ]]; then
     source ./utils.sh
 else
     # Minimal color definitions if utils.sh not available
@@ -14,13 +17,20 @@ else
     print_warning() { echo -e "${YELLOW}WARNING: $1${NC}"; }
 fi
 
-# Configuration
+# Constants
 INSTALL_DIR="$HOME/.local/share/update-arch"
 BIN_DIR="$HOME/.local/bin"
 SCRIPT_NAME="update-arch"
 REQUIRED_DEPS="bash sudo pacman systemctl"
 
-# Function to check dependencies
+# Function to extract version from update.sh
+get_version() {
+    local version_line
+    version_line=$(grep "^VERSION=" "update.sh")
+    echo "${version_line#VERSION=}" | tr -d '"'
+}
+
+# Function to verify required dependencies
 check_dependencies() {
     local missing_deps=()
     for dep in $REQUIRED_DEPS; do
@@ -29,34 +39,34 @@ check_dependencies() {
         fi
     done
     
-    if [ ${#missing_deps[@]} -ne 0 ]; then
+    if [[ ${#missing_deps[@]} -ne 0 ]]; then
         print_error "Missing required dependencies: ${missing_deps[*]}"
         return 1
     fi
     return 0
 }
 
-# Function to create directories
+# Function to set up installation directories
 create_directories() {
     mkdir -p "$INSTALL_DIR" "$BIN_DIR"
-    if [ $? -ne 0 ]; then
+    if [[ $? -ne 0 ]]; then
         print_error "Failed to create required directories"
         return 1
     fi
     return 0
 }
 
-# Function to copy files
+# Function to install script files
 copy_files() {
     local files=("update.sh" "system-check.sh" "package-update.sh" "log-manage.sh" "utils.sh")
     
     for file in "${files[@]}"; do
-        if [ ! -f "$file" ]; then
+        if [[ ! -f "$file" ]]; then
             print_error "Required file $file not found"
             return 1
         fi
         cp "$file" "$INSTALL_DIR/"
-        if [ $? -ne 0 ]; then
+        if [[ $? -ne 0 ]]; then
             print_error "Failed to copy $file"
             return 1
         fi
@@ -64,7 +74,7 @@ copy_files() {
     
     # Make scripts executable
     chmod +x "$INSTALL_DIR"/*.sh
-    if [ $? -ne 0 ]; then
+    if [[ $? -ne 0 ]]; then
         print_error "Failed to set executable permissions"
         return 1
     fi
@@ -72,19 +82,19 @@ copy_files() {
     return 0
 }
 
-# Function to create symlink
+# Function to create command symlink
 create_symlink() {
     # Remove existing symlink if it exists
-    if [ -L "$BIN_DIR/$SCRIPT_NAME" ]; then
+    if [[ -L "$BIN_DIR/$SCRIPT_NAME" ]]; then
         rm "$BIN_DIR/$SCRIPT_NAME"
-    elif [ -e "$BIN_DIR/$SCRIPT_NAME" ]; then
+    elif [[ -e "$BIN_DIR/$SCRIPT_NAME" ]]; then
         print_error "$BIN_DIR/$SCRIPT_NAME exists but is not a symlink"
         return 1
     fi
     
     # Create new symlink
     ln -s "$INSTALL_DIR/update.sh" "$BIN_DIR/$SCRIPT_NAME"
-    if [ $? -ne 0 ]; then
+    if [[ $? -ne 0 ]]; then
         print_error "Failed to create symlink"
         return 1
     fi
@@ -92,18 +102,18 @@ create_symlink() {
     return 0
 }
 
-# Function to uninstall
+# Function to remove all installed components
 uninstall() {
     print_warning "Uninstalling update-arch..."
     
     # Remove symlink
-    if [ -L "$BIN_DIR/$SCRIPT_NAME" ]; then
+    if [[ -L "$BIN_DIR/$SCRIPT_NAME" ]]; then
         rm "$BIN_DIR/$SCRIPT_NAME"
         print_success "Removed symlink"
     fi
     
     # Remove install directory
-    if [ -d "$INSTALL_DIR" ]; then
+    if [[ -d "$INSTALL_DIR" ]]; then
         rm -rf "$INSTALL_DIR"
         print_success "Removed install directory"
     fi
@@ -112,7 +122,7 @@ uninstall() {
     return 0
 }
 
-# Main installation function
+# Function to perform installation
 install() {
     echo "Installing update-arch..."
     
@@ -128,12 +138,15 @@ install() {
     # Create symlink
     create_symlink || return 1
     
-    print_success "Installation complete!"
-    echo "You can now run 'update-arch' from anywhere"
+    local version
+    version=$(get_version)
+    print_success "Installation of update-arch v${version} complete!"
+    echo -e "You can now run '${GREEN}update-arch${NC}' from anywhere"
+    echo -e "Use '${GREEN}update-arch --help${NC}' to see available options"
     return 0
 }
 
-# Main script logic
+# Main execution logic
 case "$1" in
     --uninstall)
         uninstall

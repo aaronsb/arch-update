@@ -1,13 +1,17 @@
 #!/bin/bash
-
-# Get the directory where the script is installed
-SCRIPT_DIR="$(dirname "$(readlink -f "$0")")"
+#
+# Arch Linux system update and maintenance script
+# Performs system health checks, package updates, and maintenance tasks
 
 # Source companion scripts
+SCRIPT_DIR="$(dirname "$(readlink -f "$0")")"
 source "$SCRIPT_DIR/utils.sh"
 source "$SCRIPT_DIR/system-check.sh"
 source "$SCRIPT_DIR/package-update.sh"
 source "$SCRIPT_DIR/log-manage.sh"
+
+# Constants
+VERSION="0.1.0"
 
 # Set up error handling
 set_error_handlers
@@ -96,33 +100,41 @@ main() {
 # Help text
 show_help() {
     cat << EOF
-update-arch: Arch Linux System Update Script
+${CYAN}${BOLD}update-arch${NC}: Arch Linux System Update Script
 
-Usage: update-arch [OPTIONS]
+${BOLD}Usage:${NC} update-arch [OPTIONS]
 
-Options:
-    -h, --help      Show this help message
-    --version       Show version information
-    --dry-run       Show what would be updated without making changes
+${BOLD}Options:${NC}
+    ${GREEN}-h, --help${NC}        Show this help message
+    ${GREEN}--version${NC}         Show version information
+    ${GREEN}--dry-run${NC}         Show what would be updated without making changes
+    ${GREEN}--run${NC}             Run the update process
+    ${GREEN}--confirm${NC}         Required with --run to confirm update execution
 
+${BOLD}Description:${NC}
 This script performs system updates and maintenance tasks:
-- System health checks
-- Package updates (official repos and AUR)
-- Orphaned package cleanup
-- Log management
-- Optional Flatpak and oh-my-posh updates
+${CYAN}•${NC} System health checks
+${CYAN}•${NC} Package updates (official repos and AUR)
+${CYAN}•${NC} Orphaned package cleanup
+${CYAN}•${NC} Log management
+${CYAN}•${NC} Optional Flatpak and oh-my-posh updates
 
-For more information, see: ~/.local/share/update-arch/README.md
+For more information, see: ${BLUE}~/.local/share/update-arch/README.md${NC}
 EOF
 }
 
-# Version information
-VERSION="0.1.0"
+# Function to display version information
 show_version() {
     echo "update-arch version $VERSION"
 }
 
 # Parse command line arguments
+# Main execution logic
+if [[ $# -eq 0 ]]; then
+    show_help
+    exit 0
+fi
+
 case "$1" in
     -h|--help)
         show_help
@@ -137,12 +149,17 @@ case "$1" in
         echo "Dry run functionality not yet implemented"
         exit 1
         ;;
-    "")
+    --run)
+        if [[ "$2" != "--confirm" ]]; then
+            print_error "The --confirm flag is required with --run for safety"
+            echo -e "Use ${GREEN}--run --confirm${NC} to execute updates"
+            exit 1
+        fi
         main
         ;;
     *)
-        echo "Unknown option: $1"
-        echo "Use --help for usage information"
+        print_error "Unknown option: $1"
+        echo -e "Use ${GREEN}--help${NC} for usage information"
         exit 1
         ;;
 esac

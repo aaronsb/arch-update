@@ -42,12 +42,26 @@ The installer will:
 
 ## Usage
 
-Simply run:
+Run with no arguments to see help:
 ```bash
 update-arch
 ```
 
-The script will:
+To perform updates:
+```bash
+update-arch --run --confirm
+```
+
+Available options:
+```bash
+-h, --help      Show help message
+--version       Show version information
+--dry-run       Show what would be updated without changes
+--run           Run the update process
+--confirm       Required with --run for safety
+```
+
+The update process will:
 1. Perform system health checks
 2. Update system packages
 3. Handle AUR updates
