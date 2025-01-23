@@ -22,13 +22,6 @@ set_error_handlers
 main() {
     print_header "${CLOCK_ICON} SYSTEM UPDATE STARTED AT $(date)"
     
-    # Initialize logging
-    local LOGFILE=$(setup_logging)
-    if [ -z "$LOGFILE" ]; then
-        print_error "Failed to initialize logging"
-        exit 1
-    fi
-    
     # Establish sudo session
     sudo -v
     if [ $? -ne 0 ]; then
@@ -154,9 +147,6 @@ main() {
     cleanup_sudo
 
     print_header "${CLOCK_ICON} SYSTEM UPDATE COMPLETED AT $(date)"
-    # Final status
-    echo "$LOGFILE"
-
     return 0
 }
 
@@ -178,7 +168,6 @@ This script performs system updates and maintenance tasks:
 ${CYAN}•${NC} System health checks
 ${CYAN}•${NC} Package updates (official repos and AUR)
 ${CYAN}•${NC} Orphaned package cleanup
-${CYAN}•${NC} Log management
 ${CYAN}•${NC} Optional Flatpak and oh-my-posh updates
 
 For more information, see: ${BLUE}~/.local/share/update-arch/README.md${NC}
