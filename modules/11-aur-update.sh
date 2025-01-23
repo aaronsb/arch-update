@@ -39,9 +39,10 @@ run_update() {
     print_header "${PACKAGE_ICON} UPDATING AUR PACKAGES"
     
     # Educational output about AUR
-    print_status "${INFO_ICON}" "The AUR (Arch User Repository) contains community packages"
-    print_status "${INFO_ICON}" "AUR helpers automate building and installing AUR packages"
-    print_status "${INFO_ICON}" "Learn more: https://wiki.archlinux.org/title/Arch_User_Repository"
+    print_section_box \
+        "About AUR" \
+        "The AUR (Arch User Repository) contains community packages\nAUR helpers automate building and installing AUR packages" \
+        "https://wiki.archlinux.org/title/Arch_User_Repository"
     
     # Get AUR helper
     local aur_helper=$(get_aur_helper)
@@ -50,8 +51,7 @@ run_update() {
         return 1
     fi
     
-    print_status "${INFO_ICON}" "Using AUR helper: $aur_helper"
-    print_status "${INFO_ICON}" "Supported helpers: yay, paru"
+    print_info_box "Using AUR helper: $aur_helper\nSupported helpers: yay, paru"
     
     # Check for updates first
     print_status "${SYNC_ICON}" "Checking for AUR updates..."
@@ -66,17 +66,13 @@ run_update() {
     
     if ! $aur_helper -Sua --noconfirm; then
         print_error "Failed to update AUR packages"
-        print_status "${INFO_ICON}" "Common issues:"
-        print_status "${INFO_ICON}" "- Network connectivity problems"
-        print_status "${INFO_ICON}" "- Build dependencies missing"
-        print_status "${INFO_ICON}" "- Package maintainer changes"
+        print_info_box "Common issues:\n- Network connectivity problems\n- Build dependencies missing\n- Package maintainer changes"
         return 1
     fi
     
     # Show post-update information
     print_success "AUR packages updated successfully"
-    print_status "${INFO_ICON}" "Review installed AUR packages: $aur_helper -Qm"
-    print_status "${INFO_ICON}" "Check package issues: https://aur.archlinux.org"
+    print_info_box "Review installed AUR packages: $aur_helper -Qm\nCheck package issues: https://aur.archlinux.org"
     return 0
 }
 

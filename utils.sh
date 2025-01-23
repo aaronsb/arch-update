@@ -115,6 +115,70 @@ strip_ansi() {
     sed -E 's/\x1B\[[0-9;]*[mGKH]//g'
 }
 
+# Box drawing functions for educational content
+print_info_box() {
+    local message="$1"
+    local width=60
+    local padding="    "
+    
+    # Split message into lines that fit within width
+    local wrapped_text=""
+    local line=""
+    for word in $message; do
+        local temp="$line $word"
+        if [ ${#temp} -gt $((width - 4)) ]; then
+            wrapped_text+="$line\n"
+            line="$padding$word"
+        else
+            line="$temp"
+        fi
+    done
+    wrapped_text+="$line"
+    
+    # Draw the box
+    local line_chars=$(printf '%.0s─' $(seq 1 $((width-2))))
+    echo -e "\n${CYAN}┌${line_chars}┐${NC}"
+    echo -e "$wrapped_text" | while IFS= read -r line; do
+        echo -e "${CYAN}│${NC} ${INFO_ICON} ${line}${CYAN} │${NC}"
+    done
+    echo -e "${CYAN}└${line_chars}┘${NC}\n"
+}
+
+print_section_box() {
+    local title="$1"
+    local content="$2"
+    local link="$3"
+    local width=60
+    local padding="    "
+    
+    # Calculate title padding for centering
+    local title_padding=$(( (width - ${#title} - 4) / 2 ))
+    
+    # Draw the box
+    local title_line_chars=$(printf '%.0s─' $(seq 1 $((width-${#title}-7))))
+    echo -e "\n${CYAN}┌─── $title ${title_line_chars}┐${NC}"
+    
+    # Print content lines
+    echo -e "$content" | while IFS= read -r line; do
+        if [ -n "$line" ]; then
+            echo -e "${CYAN}│${NC} ${INFO_ICON} ${line}${padding:${#line}}${CYAN} │${NC}"
+        else
+            local space_chars=$(printf '%.0s ' $(seq 1 $((width-2))))
+            echo -e "${CYAN}│${space_chars}│${NC}"
+        fi
+    done
+    
+    # Add link if provided
+    if [ -n "$link" ]; then
+        echo -e "${CYAN}│${NC}${padding}${padding}${CYAN} │${NC}"
+        echo -e "${CYAN}│${NC} 🔗 Learn more:${padding}${CYAN} │${NC}"
+        echo -e "${CYAN}│${NC}    $link${padding:${#link}}${CYAN} │${NC}"
+    fi
+    
+    local bottom_line_chars=$(printf '%.0s─' $(seq 1 $((width-2))))
+    echo -e "${CYAN}└${bottom_line_chars}┘${NC}\n"
+}
+
 # Initialize logging for the current session
 setup_logging() {
     local log_dir="$HOME/.local/share/update-arch/logs"

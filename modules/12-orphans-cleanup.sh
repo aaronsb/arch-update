@@ -35,11 +35,17 @@ backup_orphans() {
 run_update() {
     print_header "${TRASH_ICON} CHECKING FOR ORPHANED PACKAGES"
     
+    # Educational output about orphaned packages
+    print_section_box \
+        "About Orphaned Packages" \
+        "Orphaned packages are former dependencies no longer required by any installed package\nRemoving them helps maintain system cleanliness and reduces disk usage" \
+        "https://wiki.archlinux.org/title/Pacman#Removing_unused_packages"
+    
     # Find orphaned packages
     local orphans=$(pacman -Qdtq)
     if [ $? -ne 0 ]; then
         print_error "Failed to check for orphaned packages: pacman query failed"
-        print_error "Please check if pacman database is locked or corrupted"
+        print_info_box "Please check if pacman database is locked or corrupted"
         return 1
     fi
     
@@ -49,18 +55,17 @@ run_update() {
         echo "$orphans"
         
         # Create backup before removal
-        print_status "${INFO_ICON}" "Creating backup of orphaned packages list..."
+        print_info_box "Creating backup of orphaned packages list for safety\nBackup location: /tmp/update-scripts/orphans/"
         backup_orphans "$orphans"
         
         print_status "${SYNC_ICON}" "Removing orphaned packages..."
         if ! sudo pacman -Rns $orphans --noconfirm; then
             print_error "Failed to remove orphaned packages: pacman removal failed"
-            print_error "You can find the list of packages in /tmp/update-scripts/orphans/"
-            print_error "To reinstall, use: pacman -S \$(cat /tmp/update-scripts/orphans/[backup-file])"
+            print_info_box "Recovery Instructions:\n- Package list saved in /tmp/update-scripts/orphans/\n- To reinstall, use: pacman -S \$(cat /tmp/update-scripts/orphans/[backup-file])"
             return 1
         fi
         print_success "Orphaned packages removed successfully"
-        print_status "${INFO_ICON}" "Backup saved in /tmp/update-scripts/orphans/"
+        print_info_box "Backup saved in /tmp/update-scripts/orphans/\nKeep this backup until you verify system stability"
     else
         print_success "No orphaned packages found"
     fi

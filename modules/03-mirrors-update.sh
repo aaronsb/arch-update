@@ -23,9 +23,10 @@ run_update() {
     print_header "${SYNC_ICON} UPDATING MIRROR LIST"
     
     # Educational output about mirrors
-    print_status "${INFO_ICON}" "Mirrors are servers that host Arch Linux packages"
-    print_status "${INFO_ICON}" "Using fast, reliable mirrors improves download speed"
-    print_status "${INFO_ICON}" "Learn more: https://wiki.archlinux.org/title/Mirrors"
+    print_section_box \
+        "About Mirrors" \
+        "Mirrors are servers that host Arch Linux packages\nUsing fast, reliable mirrors improves download speed" \
+        "https://wiki.archlinux.org/title/Mirrors"
     
     # Check current mirror list
     local mirrorlist="/etc/pacman.d/mirrorlist"
@@ -43,18 +44,12 @@ run_update() {
     
     # Update mirrors with detailed output
     print_status "${SYNC_ICON}" "Finding fastest mirrors..."
-    print_status "${INFO_ICON}" "This may take a few minutes"
-    print_status "${INFO_ICON}" "Using criteria:"
-    print_status "${INFO_ICON}" "- Latest 20 mirrors"
-    print_status "${INFO_ICON}" "- HTTPS protocol only"
-    print_status "${INFO_ICON}" "- Sorted by download rate"
+    print_info_box "This may take a few minutes"
+    print_info_box "Using criteria:\n- Latest 20 mirrors\n- HTTPS protocol only\n- Sorted by download rate"
     
     if ! sudo reflector --latest 20 --protocol https --sort rate --save "$mirrorlist"; then
         print_error "Failed to update mirror list"
-        print_status "${INFO_ICON}" "Common issues:"
-        print_status "${INFO_ICON}" "- Network connectivity problems"
-        print_status "${INFO_ICON}" "- Mirror server issues"
-        print_status "${INFO_ICON}" "- Permission problems"
+        print_info_box "Common issues:\n- Network connectivity problems\n- Mirror server issues\n- Permission problems"
         print_status "${INFO_ICON}" "Restoring backup..."
         sudo mv "${mirrorlist}.backup" "$mirrorlist"
         return 1
@@ -69,8 +64,7 @@ run_update() {
     fi
     
     print_success "Mirror list updated successfully"
-    print_status "${INFO_ICON}" "Backup saved as: ${mirrorlist}.backup"
-    print_status "${INFO_ICON}" "View mirrors: cat $mirrorlist"
+    print_info_box "Backup saved as: ${mirrorlist}.backup\nView mirrors: cat $mirrorlist"
     return 0
 }
 

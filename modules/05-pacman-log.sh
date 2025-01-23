@@ -23,9 +23,10 @@ run_update() {
     print_header "${SYNC_ICON} MAINTAINING PACMAN LOGS"
     
     # Educational output about pacman logs
-    print_status "${INFO_ICON}" "Pacman logs track all package operations"
-    print_status "${INFO_ICON}" "Regular rotation prevents excessive disk usage"
-    print_status "${INFO_ICON}" "Learn more: https://wiki.archlinux.org/title/Pacman#Logging"
+    print_section_box \
+        "About Pacman Logs" \
+        "Pacman logs track all package operations\nRegular rotation prevents excessive disk usage" \
+        "https://wiki.archlinux.org/title/Pacman#Logging"
     
     local pacman_log="/var/log/pacman.log"
     local max_size=10240  # 10MB in KB
@@ -33,7 +34,7 @@ run_update() {
     # Check log permissions
     if [ ! -w "$(dirname "$pacman_log")" ]; then
         print_error "Log directory is not writable"
-        print_status "${INFO_ICON}" "Fix permissions: sudo chown -R root:root /var/log"
+        print_info_box "Fix permissions: sudo chown -R root:root /var/log"
         return 1
     fi
     
@@ -58,10 +59,7 @@ run_update() {
         # Rotate current log
         if ! sudo mv "$pacman_log" "${pacman_log}.old"; then
             print_error "Failed to rotate pacman log"
-            print_status "${INFO_ICON}" "Common issues:"
-            print_status "${INFO_ICON}" "- Insufficient permissions"
-            print_status "${INFO_ICON}" "- Disk space limitations"
-            print_status "${INFO_ICON}" "- File system errors"
+            print_info_box "Common issues:\n- Insufficient permissions\n- Disk space limitations\n- File system errors"
             return 1
         fi
         
@@ -78,10 +76,7 @@ run_update() {
     fi
     
     # Show log statistics
-    print_status "${INFO_ICON}" "Log management tips:"
-    print_status "${INFO_ICON}" "- View recent activity: tail -n 50 $pacman_log"
-    print_status "${INFO_ICON}" "- Search operations: grep 'upgraded' $pacman_log"
-    print_status "${INFO_ICON}" "- Check removals: grep 'removed' $pacman_log"
+    print_info_box "Log management tips:\n- View recent activity: tail -n 50 $pacman_log\n- Search operations: grep 'upgraded' $pacman_log\n- Check removals: grep 'removed' $pacman_log"
     
     return 0
 }

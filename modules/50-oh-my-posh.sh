@@ -21,9 +21,10 @@ run_update() {
     print_header "${SYNC_ICON} UPDATING OH-MY-POSH"
     
     # Educational output about oh-my-posh
-    print_status "${INFO_ICON}" "oh-my-posh is a custom prompt engine for any shell"
-    print_status "${INFO_ICON}" "Regular updates ensure latest features and security"
-    print_status "${INFO_ICON}" "Learn more: https://ohmyposh.dev/"
+    print_section_box \
+        "About Oh My Posh" \
+        "oh-my-posh is a custom prompt engine for any shell\nRegular updates ensure latest features and security" \
+        "https://ohmyposh.dev/"
     
     # Check current version before update
     print_status "${SYNC_ICON}" "Checking current version..."
@@ -31,12 +32,12 @@ run_update() {
         print_error "Failed to get current version"
         return 1
     fi
-    print_status "${INFO_ICON}" "Current version: ${current_version}"
+    print_info_box "Current version: ${current_version}"
     
     # Check for config file
     config_file="${HOME}/.config/oh-my-posh/config.json"
     if [[ -f "${config_file}" ]]; then
-        print_status "${INFO_ICON}" "Found configuration at: ${config_file}"
+        print_info_box "Found configuration at: ${config_file}"
     else
         print_warning "No custom configuration found at: ${config_file}"
     fi
@@ -55,16 +56,13 @@ run_update() {
     fi
     if [[ "${current_version}" != "${new_version}" ]]; then
         print_success "Updated from ${current_version} to ${new_version}"
-        print_status "${INFO_ICON}" "Review changelog: https://github.com/JanDeDobbeleer/oh-my-posh/releases"
+        print_info_box "Review changelog: https://github.com/JanDeDobbeleer/oh-my-posh/releases"
     else
         print_success "oh-my-posh is already at latest version ${current_version}"
     fi
     
     # Additional educational information
-    print_status "${INFO_ICON}" "Configuration tips:"
-    print_status "${INFO_ICON}" "- Backup your config file regularly"
-    print_status "${INFO_ICON}" "- Check themes at: https://ohmyposh.dev/docs/themes"
-    print_status "${INFO_ICON}" "- Test changes with: oh-my-posh init bash --config path/to/config.json"
+    print_info_box "Configuration Tips:\n- Backup your config file regularly\n- Check themes at: https://ohmyposh.dev/docs/themes\n- Test changes with: oh-my-posh init bash --config path/to/config.json"
     
     return 0
 }

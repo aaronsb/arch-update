@@ -22,9 +22,10 @@ run_update() {
     print_header "${PACKAGE_ICON} UPDATING SYSTEM PACKAGES"
     
     # Educational output about package management
-    print_status "${INFO_ICON}" "pacman is the package manager for Arch Linux"
-    print_status "${INFO_ICON}" "Regular updates ensure system stability and security"
-    print_status "${INFO_ICON}" "Learn more: https://wiki.archlinux.org/title/Pacman"
+    print_section_box \
+        "About Package Management" \
+        "pacman is the package manager for Arch Linux\nRegular updates ensure system stability and security" \
+        "https://wiki.archlinux.org/title/Pacman"
     
     # Check for updates without modifying the system
     if command -v checkupdates &>/dev/null; then
@@ -55,17 +56,13 @@ run_update() {
     
     if ! sudo pacman -Syu --noconfirm; then
         print_error "Failed to update system packages"
-        print_status "${INFO_ICON}" "Common issues:"
-        print_status "${INFO_ICON}" "- Network connectivity problems"
-        print_status "${INFO_ICON}" "- Mirror synchronization issues"
-        print_status "${INFO_ICON}" "- Disk space limitations"
+        print_info_box "Common issues:\n- Network connectivity problems\n- Mirror synchronization issues\n- Disk space limitations"
         return 1
     fi
     
     # Show post-update tips
     print_success "System packages updated successfully"
-    print_status "${INFO_ICON}" "Some updates may require system restart"
-    print_status "${INFO_ICON}" "Check pacman logs: /var/log/pacman.log"
+    print_info_box "Some updates may require system restart\nCheck pacman logs: /var/log/pacman.log"
     return 0
 }
 

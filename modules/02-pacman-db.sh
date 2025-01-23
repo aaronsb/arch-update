@@ -20,9 +20,10 @@ run_update() {
     print_header "${PACKAGE_ICON} VERIFYING PACKAGE DATABASE"
     
     # Educational output about package database
-    print_status "${INFO_ICON}" "The pacman database tracks installed packages"
-    print_status "${INFO_ICON}" "Database integrity is crucial for system stability"
-    print_status "${INFO_ICON}" "Learn more: https://wiki.archlinux.org/title/Pacman#Package_database"
+    print_section_box \
+        "About Package Database" \
+        "The pacman database tracks installed packages\nDatabase integrity is crucial for system stability" \
+        "https://wiki.archlinux.org/title/Pacman#Package_database"
     
     # Check database location
     local db_path="/var/lib/pacman"
@@ -34,7 +35,7 @@ run_update() {
     # Check database permissions
     if [ ! -w "$db_path" ]; then
         print_error "Package database is not writable"
-        print_status "${INFO_ICON}" "Fix permissions: sudo chown -R root:root $db_path"
+        print_info_box "Fix permissions: sudo chown -R root:root $db_path"
         return 1
     fi
     
@@ -42,18 +43,12 @@ run_update() {
     print_status "${SYNC_ICON}" "Checking package database integrity..."
     if ! sudo pacman -Dk &>/dev/null; then
         print_warning "Package database needs repair"
-        print_status "${INFO_ICON}" "This may be due to:"
-        print_status "${INFO_ICON}" "- Interrupted package operations"
-        print_status "${INFO_ICON}" "- Disk errors or power failures"
-        print_status "${INFO_ICON}" "- Manual database modifications"
+        print_info_box "This may be due to:\n- Interrupted package operations\n- Disk errors or power failures\n- Manual database modifications"
         
         print_status "${SYNC_ICON}" "Attempting database repair..."
         if ! sudo pacman -Dk --fix; then
             print_error "Failed to repair package database"
-            print_status "${INFO_ICON}" "Manual intervention may be required:"
-            print_status "${INFO_ICON}" "1. Backup: cp -r $db_path ${db_path}.bak"
-            print_status "${INFO_ICON}" "2. Remove: sudo rm -r $db_path/local"
-            print_status "${INFO_ICON}" "3. Reinit: sudo pacman -Sy"
+            print_info_box "Manual intervention may be required:\n1. Backup: cp -r $db_path ${db_path}.bak\n2. Remove: sudo rm -r $db_path/local\n3. Reinit: sudo pacman -Sy"
             return 1
         fi
         print_success "Database repaired successfully"

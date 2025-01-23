@@ -30,41 +30,35 @@ run_update() {
     print_header "${INFO_ICON} USER MAINTENANCE EXAMPLE"
     
     # User Module Structure Example
-    print_status "${INFO_ICON}" "=== User Module Structure Example ==="
-    print_status "${INFO_ICON}" "1. Header with description and safety info"
-    print_status "${INFO_ICON}" "2. MODULE_TYPE declaration as 'user'"
-    print_status "${INFO_ICON}" "3. User permission checks"
-    print_status "${INFO_ICON}" "4. Configuration handling"
-    print_status "${INFO_ICON}" "Learn more: https://wiki.archlinux.org/title/User:Example"
+    print_section_box \
+        "User Module Structure Example" \
+        "1. Header with description and safety info\n2. MODULE_TYPE declaration as 'user'\n3. User permission checks\n4. Configuration handling" \
+        "https://wiki.archlinux.org/title/User:Example"
     
     # AUR Package Management Example
     print_status "${INFO_ICON}" "=== AUR Package Management Example ==="
     print_status "${SYNC_ICON}" "Checking AUR packages..."
     if ! aur_count=$(pacman -Qm | wc -l); then
         print_error "Failed to check AUR packages"
-        print_error "Common issues:"
-        print_error "- Database access"
-        print_error "- Package manager lock"
+        print_info_box "Common issues:\n- Database access\n- Package manager lock"
         return 1
     fi
-    print_status "${INFO_ICON}" "Found ${aur_count} AUR packages"
-    print_status "${INFO_ICON}" "Learn more: https://wiki.archlinux.org/title/AUR_helpers"
+    print_section_box \
+        "AUR Package Management" \
+        "Found ${aur_count} AUR packages\nAUR helpers automate building and installing community packages" \
+        "https://wiki.archlinux.org/title/AUR_helpers"
     
     # User Configuration Example
-    print_status "${INFO_ICON}" "=== User Configuration Example ==="
-    print_status "${INFO_ICON}" "Configuration locations:"
-    print_status "${INFO_ICON}" "1. ~/.config - XDG config home"
-    print_status "${INFO_ICON}" "2. ~/.local/share - XDG data home"
-    print_status "${INFO_ICON}" "3. ~/.cache - XDG cache home"
-    print_status "${INFO_ICON}" "Learn more: https://wiki.archlinux.org/title/XDG_Base_Directory"
+    print_section_box \
+        "User Configuration Example" \
+        "Configuration locations:\n1. ~/.config - XDG config home\n2. ~/.local/share - XDG data home\n3. ~/.cache - XDG cache home" \
+        "https://wiki.archlinux.org/title/XDG_Base_Directory"
     
     # Safety Features Example
-    print_status "${INFO_ICON}" "=== User Safety Features Example ==="
-    print_status "${INFO_ICON}" "1. Config file backups"
-    print_status "${INFO_ICON}" "2. Permission verification"
-    print_status "${INFO_ICON}" "3. Safe update practices"
-    print_status "${INFO_ICON}" "4. Recovery options"
-    print_status "${INFO_ICON}" "Learn more: https://wiki.archlinux.org/title/System_maintenance#User_specific"
+    print_section_box \
+        "User Safety Features Example" \
+        "1. Config file backups\n2. Permission verification\n3. Safe update practices\n4. Recovery options" \
+        "https://wiki.archlinux.org/title/System_maintenance#User_specific"
     
     return 0
 }

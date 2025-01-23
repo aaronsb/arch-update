@@ -23,16 +23,16 @@ run_update() {
     print_header "${TRASH_ICON} MAINTAINING SYSTEM JOURNALS"
     
     # Educational output about system journals
-    print_status "${INFO_ICON}" "The systemd journal records system events and logs"
-    print_status "${INFO_ICON}" "Regular cleanup prevents excessive disk usage"
-    print_status "${INFO_ICON}" "Learn more: https://wiki.archlinux.org/title/Systemd/Journal"
+    print_section_box \
+        "About System Journals" \
+        "The systemd journal records system events and logs\nRegular cleanup prevents excessive disk usage" \
+        "https://wiki.archlinux.org/title/Systemd/Journal"
     
     # Check journal directory
     local journal_dir="/var/log/journal"
     if [ ! -d "$journal_dir" ]; then
         print_warning "Journal directory not found: $journal_dir"
-        print_status "${INFO_ICON}" "System may be using volatile logging"
-        print_status "${INFO_ICON}" "See: https://wiki.archlinux.org/title/Systemd/Journal#Persistent_journals"
+        print_info_box "System may be using volatile logging\nSee: https://wiki.archlinux.org/title/Systemd/Journal#Persistent_journals"
         return 0
     fi
     
@@ -44,18 +44,13 @@ run_update() {
     fi
     
     # Show retention settings
-    print_status "${INFO_ICON}" "Cleanup criteria:"
-    print_status "${INFO_ICON}" "- Remove entries older than 2 weeks"
-    print_status "${INFO_ICON}" "- Keep total size under 500MB"
+    print_info_box "Cleanup criteria:\n- Remove entries older than 2 weeks\n- Keep total size under 500MB"
     
     # Clean old system journals
     print_status "${SYNC_ICON}" "Cleaning system journals..."
     if ! sudo journalctl --vacuum-time=2weeks --vacuum-size=500M; then
         print_error "Failed to clean system journals"
-        print_status "${INFO_ICON}" "Common issues:"
-        print_status "${INFO_ICON}" "- Insufficient permissions"
-        print_status "${INFO_ICON}" "- Journal directory corruption"
-        print_status "${INFO_ICON}" "- System resource limitations"
+        print_info_box "Common issues:\n- Insufficient permissions\n- Journal directory corruption\n- System resource limitations"
         return 1
     fi
     
@@ -67,9 +62,7 @@ run_update() {
     fi
     
     # Show journal statistics
-    print_status "${INFO_ICON}" "Journal statistics:"
-    journalctl --disk-usage
-    print_status "${INFO_ICON}" "View recent logs: journalctl -n 50"
+    print_info_box "Journal statistics:\n$(journalctl --disk-usage)\n\nView recent logs: journalctl -n 50"
     
     return 0
 }

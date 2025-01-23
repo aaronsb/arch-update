@@ -23,9 +23,10 @@ run_update() {
     print_header "${SYNC_ICON} MAINTAINING UPDATE LOGS"
     
     # Educational output about update logs
-    print_status "${INFO_ICON}" "Update logs track system maintenance history"
-    print_status "${INFO_ICON}" "Regular cleanup ensures efficient disk usage"
-    print_status "${INFO_ICON}" "Learn more: https://wiki.archlinux.org/title/System_maintenance#System_log"
+    print_section_box \
+        "About Update Logs" \
+        "Update logs track system maintenance history\nRegular cleanup ensures efficient disk usage" \
+        "https://wiki.archlinux.org/title/System_maintenance#System_log"
     
     local update_logs="/var/log/system_updates"
     local max_logs=5
@@ -33,7 +34,7 @@ run_update() {
     # Check directory permissions
     if [ ! -w "$update_logs" ]; then
         print_error "Update logs directory is not writable"
-        print_status "${INFO_ICON}" "Fix permissions: sudo chown -R root:root $update_logs"
+        print_info_box "Fix permissions: sudo chown -R root:root $update_logs"
         return 1
     fi
     
@@ -83,10 +84,7 @@ run_update() {
     fi
     
     # Show log statistics
-    print_status "${INFO_ICON}" "Log management tips:"
-    print_status "${INFO_ICON}" "- View latest log: ls -lt $update_logs | head -n 2"
-    print_status "${INFO_ICON}" "- Check archived logs: ls -l $update_logs/archive"
-    print_status "${INFO_ICON}" "- Search updates: grep 'upgraded' $update_logs/*"
+    print_info_box "Log management tips:\n- View latest log: ls -lt $update_logs | head -n 2\n- Check archived logs: ls -l $update_logs/archive\n- Search updates: grep 'upgraded' $update_logs/*"
     
     return 0
 }

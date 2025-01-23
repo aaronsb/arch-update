@@ -52,6 +52,12 @@ get_update_details() {
 run_update() {
     print_header "${PACKAGE_ICON} UPDATING FLATPAK PACKAGES"
     
+    # Educational output about Flatpak
+    print_section_box \
+        "About Flatpak" \
+        "Flatpak provides containerized applications with automatic updates\nPackages are sandboxed for enhanced security and compatibility" \
+        "https://wiki.archlinux.org/title/Flatpak"
+    
     # Verify network connectivity first
     if ! check_network; then
         return 1
@@ -68,7 +74,7 @@ run_update() {
     local updates=$(flatpak remote-ls --updates)
     if [ $? -ne 0 ]; then
         print_error "Failed to check for updates: flatpak remote-ls failed"
-        print_error "Try running 'flatpak repair' to fix repository issues"
+        print_info_box "Try running 'flatpak repair' to fix repository issues"
         return 1
     fi
     
@@ -86,15 +92,12 @@ run_update() {
     print_status "${SYNC_ICON}" "Updating Flatpak packages..."
     if ! flatpak update -y; then
         print_error "Failed to update Flatpak packages"
-        print_error "Common issues:"
-        print_error "- Disk space: Check available space with 'df -h'"
-        print_error "- Permissions: Ensure proper user permissions"
-        print_error "- Repository: Try 'flatpak repair' to fix repo issues"
+        print_info_box "Common issues:\n- Disk space: Check available space with 'df -h'\n- Permissions: Ensure proper user permissions\n- Repository: Try 'flatpak repair' to fix repo issues"
         return 1
     fi
     
     print_success "Flatpak packages updated successfully"
-    print_status "${INFO_ICON}" "To roll back: use 'flatpak history' and 'flatpak undo'"
+    print_info_box "Rollback Instructions:\nUse 'flatpak history' to view changes\nUse 'flatpak undo' to revert updates"
     return 0
 }
 

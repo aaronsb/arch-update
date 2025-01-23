@@ -35,8 +35,14 @@ backup_package_list() {
 run_update() {
     print_header "${TRASH_ICON} CLEANING PACKAGE CACHE"
     
+    # Educational output about package cache
+    print_section_box \
+        "About Package Cache" \
+        "The package cache stores downloaded packages for possible rollbacks\nRegular cleanup prevents excessive disk usage while keeping recent versions" \
+        "https://wiki.archlinux.org/title/Pacman#Cleaning_the_package_cache"
+    
     # Create backup of current package list
-    print_status "${INFO_ICON}" "Creating backup of current package list..."
+    print_info_box "Creating backup of current package list for safety\nBackup location: /tmp/update-scripts/cache/"
     backup_package_list
     
     # Get initial cache size
@@ -47,7 +53,7 @@ run_update() {
     print_status "${SYNC_ICON}" "Cleaning package cache (keeping last 3 versions)..."
     if ! sudo paccache -r; then
         print_error "Failed to clean package cache: paccache removal failed"
-        print_error "Please check if pacman is currently running or if the cache is locked"
+        print_info_box "Common issues:\n- Pacman is currently running\n- Cache directory is locked\n- Insufficient permissions"
         return 1
     fi
     
@@ -61,11 +67,7 @@ run_update() {
     # Get final cache size
     local final_size=$(du -sh /var/cache/pacman/pkg/ 2>/dev/null | cut -f1)
     local saved_space=$(echo "$initial_size $final_size" | awk '{print $1-$2}')
-    print_status "${INFO_ICON}" "Package cache cleanup summary:"
-    print_status "${INFO_ICON}" "- Initial size: $initial_size"
-    print_status "${INFO_ICON}" "- Final size: $final_size"
-    print_status "${INFO_ICON}" "- Space freed: $saved_space"
-    print_status "${INFO_ICON}" "- Backup saved in /tmp/update-scripts/cache/"
+    print_info_box "Package Cache Cleanup Summary:\n- Initial size: $initial_size\n- Final size: $final_size\n- Space freed: $saved_space\n- Backup saved in /tmp/update-scripts/cache/\n\nNote: Last 3 versions of each package are kept for safety"
     
     print_success "Package cache cleaned successfully"
     return 0

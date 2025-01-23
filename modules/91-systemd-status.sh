@@ -23,9 +23,10 @@ run_update() {
     print_header "${SERVICE_ICON} CHECKING SYSTEM SERVICES"
     
     # Educational output about systemd
-    print_status "${INFO_ICON}" "systemd manages system services and resources"
-    print_status "${INFO_ICON}" "Failed units may indicate system problems"
-    print_status "${INFO_ICON}" "Learn more: https://wiki.archlinux.org/title/Systemd"
+    print_section_box \
+        "About Systemd" \
+        "systemd manages system services and resources\nFailed units may indicate system problems" \
+        "https://wiki.archlinux.org/title/Systemd"
     
     # Check overall system state
     print_status "${SYNC_ICON}" "Checking system state..."
@@ -46,17 +47,12 @@ run_update() {
         systemctl --failed
         
         # Provide troubleshooting tips
-        print_status "${INFO_ICON}" "Troubleshooting tips:"
-        print_status "${INFO_ICON}" "- Check unit status: systemctl status unit-name"
-        print_status "${INFO_ICON}" "- View logs: journalctl -u unit-name"
-        print_status "${INFO_ICON}" "- Restart unit: sudo systemctl restart unit-name"
+        print_info_box "Troubleshooting Tips:\n- Check unit status: systemctl status unit-name\n- View logs: journalctl -u unit-name\n- Restart unit: sudo systemctl restart unit-name"
         return 1
     fi
     
     # Show system statistics
-    print_status "${INFO_ICON}" "System statistics:"
-    print_status "${INFO_ICON}" "Total units: $(systemctl list-units --all --no-legend | wc -l)"
-    print_status "${INFO_ICON}" "Active units: $(systemctl list-units --state=active --no-legend | wc -l)"
+    print_info_box "System Statistics:\n- Total units: $(systemctl list-units --all --no-legend | wc -l)\n- Active units: $(systemctl list-units --state=active --no-legend | wc -l)"
     
     print_success "All system services are running normally"
     return 0

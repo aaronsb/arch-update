@@ -22,13 +22,15 @@ run_update() {
     print_header "${INFO_ICON} SYSTEM INFORMATION"
     
     # Educational output explaining fastfetch
-    print_status "${INFO_ICON}" "Displaying system information using fastfetch"
-    print_status "${INFO_ICON}" "Fastfetch is a fast, highly customizable system info tool"
-    print_status "${INFO_ICON}" "Learn more: https://github.com/fastfetch-cli/fastfetch"
+    print_section_box \
+        "About Fastfetch" \
+        "Fastfetch is a fast, highly customizable system info tool\nDisplays detailed system information in a clean, organized format" \
+        "https://github.com/fastfetch-cli/fastfetch"
     
     # Run fastfetch with error handling
     if ! fastfetch; then
         print_error "Failed to display system information"
+        print_info_box "Common issues:\n- Configuration file missing or invalid\n- Required system information not accessible\n- Display issues with certain terminal emulators"
         return 1
     fi
     
