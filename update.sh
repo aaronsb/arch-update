@@ -3,14 +3,14 @@
 # Arch Linux system update and maintenance script
 # Performs system health checks, package updates, and maintenance tasks
 
-# Source companion scripts
+# Constants
 SCRIPT_DIR="$(dirname "$(readlink -f "$0")")"
+INSTALL_DIR="$HOME/.local/share/update-arch"
+VERSION="0.2.0"
+
+# Source companion scripts
 source "$SCRIPT_DIR/utils.sh"
 source "$SCRIPT_DIR/system-check.sh"
-source "$SCRIPT_DIR/log-manage.sh"
-
-# Constants
-VERSION="0.2.0"
 
 # Icons for privilege levels
 SUDO_ICON="🔐"
@@ -23,7 +23,7 @@ main() {
     print_header "${CLOCK_ICON} SYSTEM UPDATE STARTED AT $(date)"
     
     # Initialize logging
-    local LOGFILE=$(manage_logs)
+    local LOGFILE=$(setup_logging)
     if [ -z "$LOGFILE" ]; then
         print_error "Failed to initialize logging"
         exit 1
@@ -40,11 +40,8 @@ main() {
     ( while true; do sudo -v; sleep 60; done; ) &
     SUDO_REFRESH_PID=$!
     
-    # Redirect output to log file while maintaining console output
-    exec &> >(tee -a "$LOGFILE")
-    
     # Perform system health checks
-    if ! check_system_health; then
+    if ! check_system_health "$INSTALL_DIR"; then
         print_error "System health checks failed"
         kill $SUDO_REFRESH_PID
         exit 1

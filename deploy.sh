@@ -59,7 +59,7 @@ create_directories() {
 # Function to install script files
 copy_files() {
     # Copy core scripts
-    local core_files=("update.sh" "system-check.sh" "package-update.sh" "log-manage.sh" "utils.sh")
+    local core_files=("update.sh" "system-check.sh" "package-update.sh" "utils.sh")
     
     for file in "${core_files[@]}"; do
         if [[ ! -f "$file" ]]; then

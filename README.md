@@ -78,7 +78,7 @@ Core:
 - **update.sh**: Main script orchestrator
 - **system-check.sh**: Pre-update system health verification
 - **package-update.sh**: Package management operations
-- **log-manage.sh**: Log handling and rotation
+- **utils.sh**: Core utilities, logging setup, and helper functions
 - **utils.sh**: Shared functions and utilities
 
 Modules (in modules/):

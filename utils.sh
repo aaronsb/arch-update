@@ -26,37 +26,45 @@ KEY_ICON=''
 
 # Logging functions
 print_header() {
-    echo "\n${BLUE}${BOLD}════════════════════════════════════════════════════════════════${NC}"
-    echo "${CYAN}${BOLD} $1 ${NC}"
-    echo "${BLUE}${BOLD}════════════════════════════════════════════════════════════════${NC}\n"
+    echo -e "\n${BLUE}${BOLD}════════════════════════════════════════════════════════════════${NC}"
+    echo -e "${CYAN}${BOLD} $1 ${NC}"
+    echo -e "${BLUE}${BOLD}════════════════════════════════════════════════════════════════${NC}\n"
 }
 
 print_status() {
-    echo "${CYAN}$1 ${NC}$2"
+    echo -e "${CYAN}$1 ${NC}$2"
 }
 
 print_success() {
-    echo "${GREEN}${SUCCESS_ICON} $1${NC}"
+    echo -e "${GREEN}${SUCCESS_ICON} $1${NC}"
 }
 
 print_warning() {
-    echo "${YELLOW}${WARNING_ICON} $1${NC}"
+    echo -e "${YELLOW}${WARNING_ICON} $1${NC}"
 }
 
 print_error() {
-    echo "${RED}${ERROR_ICON} $1${NC}"
+    echo -e "${RED}${ERROR_ICON} $1${NC}"
     return 1
 }
 
 # System check functions
 check_network() {
     print_status "${NETWORK_ICON}" "Checking network connectivity..."
-    if ! ping -c 1 archlinux.org &>/dev/null; then
-        print_error "No network connectivity"
-        return 1
-    fi
-    print_success "Network connectivity verified"
-    return 0
+    
+    # List of servers to try, in order of preference
+    local servers=("archlinux.org" "google.com" "cloudflare.com")
+    local timeout=5  # timeout in seconds
+    
+    for server in "${servers[@]}"; do
+        if ping -c 1 -W $timeout "$server" &>/dev/null; then
+            print_success "Network connectivity verified (via $server)"
+            return 0
+        fi
+    done
+    
+    print_error "No network connectivity (tried ${#servers[@]} servers)"
+    return 1
 }
 
 check_disk_space() {
@@ -69,19 +77,6 @@ check_disk_space() {
         return 1
     fi
     print_success "Sufficient disk space available"
-    return 0
-}
-
-check_pacman_keyring() {
-    print_status "${KEY_ICON}" "Checking pacman keyring..."
-    if ! pacman-key --check-trustdb &>/dev/null; then
-        print_warning "Pacman keyring needs updating"
-        if ! pacman-key --populate archlinux &>/dev/null; then
-            print_error "Failed to update pacman keyring"
-            return 1
-        fi
-    fi
-    print_success "Pacman keyring verified"
     return 0
 }
 
@@ -109,7 +104,13 @@ set_error_handlers() {
     trap 'handle_error "Script error on line $LINENO" 1' ERR
 }
 
-# Logging setup
+# Strip ANSI color codes
+strip_ansi() {
+    # Remove ANSI escape sequences while preserving actual content
+    sed -E 's/\x1B\[[0-9;]*[mGKH]//g'
+}
+
+# Initialize logging for the current session
 setup_logging() {
     local log_dir="/var/log/system_updates"
     local max_logs=5
@@ -123,9 +124,17 @@ setup_logging() {
         sudo rm "$log_dir/$oldest_log"
     fi
     
-    # Create new log file
-    local logfile="$log_dir/update_$(date +'%Y%m%d_%H%M%S').log"
+    # Create new log file with shorter name
+    local timestamp=$(date +'%y%m%d%H%M')
+    local logfile="$log_dir/up$timestamp.log"
     sudo touch "$logfile"
+    
+    # Set up logging with color handling - strip ANSI codes from log file
+    exec 1> >(tee >(strip_ansi >> "$logfile"))
+    exec 2> >(tee >(strip_ansi >> "$logfile" >&2))
+    export TERM=xterm-256color  # Ensure proper color support
+    
+    print_status "${LOG_ICON}" "Created log file: ${BOLD}$logfile${NC}"
     
     echo "$logfile"
 }
