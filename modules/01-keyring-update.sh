@@ -12,7 +12,7 @@ if ! command -v print_header &>/dev/null; then
 fi
 
 check_supported() {
-    # This module is supported on all Arch Linux systems
+    # This module is supported on all Arch Linux systems, and returns an unconditional success.
     return 0
 }
 
@@ -43,7 +43,7 @@ run_update() {
     print_status "${SYNC_ICON}" "Verifying trust database..."
     if ! pacman-key --check-trustdb &>/dev/null; then
         print_warning "Trust database needs updating"
-        print_info_box "This ensures all trusted keys are properly recorded"
+        print_info_box "This ensures all trusted keys are properly recorded\nSometimes, this process is lengthy and may appear with some errors due to the nature of keyserver availability."
         
         # Update keyring with explanation
         print_status "${SYNC_ICON}" "Populating keyring with official Arch Linux keys..."
