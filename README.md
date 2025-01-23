@@ -38,10 +38,20 @@ cd arch-update
 ```
 
 The installer will:
-1. Create directory ~/.local/share/update-arch
-2. Copy all required scripts
-3. Create symlink in ~/.local/bin
-4. Set appropriate permissions
+1. Verify it's running from a git repository (required for deployment)
+2. Check for existing deployment:
+   - Warns about any local modifications
+   - Detects extra files not in git repository
+   - Offers to clean up extra files
+3. Create directory ~/.local/share/update-arch
+4. Copy all tracked files from git
+5. Create symlink in ~/.local/bin
+6. Set appropriate permissions
+
+Note: The deployment process uses git to track files and manage changes:
+- Local modifications to deployed files will be detected and reported
+- Extra files in deployment directory are identified
+- Users are encouraged to manage custom changes through git
 
 ## Usage
 

@@ -46,6 +46,127 @@ check_dependencies() {
     return 0
 }
 
+# Function to get list of tracked files from git
+get_tracked_files() {
+    if ! git rev-parse --is-inside-work-tree &>/dev/null; then
+        print_error "Not in a git repository"
+        return 1
+    fi
+    
+    # Get list of tracked files, excluding .git* files
+    git ls-files | grep -v "^\.git"
+    return $?
+}
+
+# Function to compute hash of a file
+compute_file_hash() {
+    local file="$1"
+    if [[ -f "$file" ]]; then
+        git hash-object "$file"
+    else
+        echo "file_not_found"
+    fi
+}
+
+# Function to detect modified files in deployment
+compute_file_changes() {
+    local source_file deployed_file source_hash deployed_hash
+    local modified_files=()
+    
+    while IFS= read -r file; do
+        source_file="$file"
+        deployed_file="$INSTALL_DIR/$file"
+        
+        # Skip if deployed file doesn't exist
+        [[ ! -f "$deployed_file" ]] && continue
+        
+        source_hash=$(compute_file_hash "$source_file")
+        deployed_hash=$(compute_file_hash "$deployed_file")
+        
+        if [[ "$source_hash" != "$deployed_hash" ]]; then
+            modified_files+=("$file")
+        fi
+    done < <(get_tracked_files)
+    
+    (IFS=$'\n'; echo "${modified_files[*]}")
+}
+
+# Function to detect extra files in deployment
+detect_extra_files() {
+    local tracked_files extra_files=()
+    local deploy_base="${INSTALL_DIR#"$HOME/"}"  # Remove $HOME/ prefix for cleaner output
+    
+    # Get tracked files
+    tracked_files=$(get_tracked_files)
+    
+    # Find all files in deployment directory
+    while IFS= read -r deployed_file; do
+        # Convert to relative path
+        local rel_path="${deployed_file#"$INSTALL_DIR/"}"
+        
+        # Check if file is tracked
+        if ! echo "$tracked_files" | grep -Fq "$rel_path"; then
+            extra_files+=("$deploy_base/$rel_path")
+        fi
+    done < <(find "$INSTALL_DIR" -type f 2>/dev/null)
+    
+    (IFS=$'\n'; echo "${extra_files[*]}")
+}
+
+# Function to handle extra files
+handle_extra_files() {
+    local extra_files="$1"
+    local reply
+    
+    echo
+    print_warning "The following files were found in the deployment directory but are not in the git repository:"
+    echo "$extra_files" | sed 's/^/  /'
+    echo
+    print_warning "These files may cause unexpected behavior. It's recommended to:"
+    echo "1. Move important files to your git repository"
+    echo "2. Remove extra files from the deployment directory"
+    echo
+    echo "Would you like to remove these extra files? [y/N]"
+    read -r reply
+    
+    case "$reply" in
+        [Yy]*)
+            echo "$extra_files" | while IFS= read -r file; do
+                rm -f "$HOME/$file"
+                echo "Removed: $file"
+            done
+            return 0
+            ;;
+        *)
+            print_warning "Keeping extra files - they may cause unexpected behavior"
+            return 1
+            ;;
+    esac
+}
+
+# Function to check existing deployment
+check_existing_deployment() {
+    if [[ ! -d "$INSTALL_DIR" ]]; then
+        return 1
+    fi
+    
+    local modified_files
+    modified_files=$(compute_file_changes)
+    
+    if [[ -n "$modified_files" ]]; then
+        print_warning "The following deployed files have been modified:"
+        echo "$modified_files" | sed 's/^/  /'
+        echo
+        print_warning "Proceeding will overwrite these modifications"
+        echo "Consider moving any important changes to your git repository"
+        echo
+        echo "Press Enter to continue or Ctrl+C to abort"
+        read -r
+    fi
+    
+    return 0
+}
+
 # Function to set up installation directories
 create_directories() {
     mkdir -p "$INSTALL_DIR" "$BIN_DIR" "$INSTALL_DIR/modules"
@@ -58,40 +179,57 @@ create_directories() {
 
 # Function to install script files
 copy_files() {
-    # Copy core scripts
-    local core_files=("update.sh" "system-check.sh" "package-update.sh" "utils.sh")
+    local file target_dir target_file
+    local copied_files=0
+    local tracked_files
     
-    for file in "${core_files[@]}"; do
-        if [[ ! -f "$file" ]]; then
-            print_error "Required file $file not found"
-            return 1
+    # Get list of tracked files from git
+    tracked_files=$(get_tracked_files) || {
+        print_error "Failed to get list of tracked files"
+        return 1
+    }
+    
+    # Process each tracked file
+    while IFS= read -r file; do
+        # Skip empty lines
+        [[ -z "$file" ]] && continue
+        
+        # Determine target directory
+        if [[ "$file" == modules/* ]]; then
+            target_dir="$INSTALL_DIR/modules"
+            target_file="$INSTALL_DIR/$file"
+        else
+            target_dir="$INSTALL_DIR"
+            target_file="$INSTALL_DIR/$file"
         fi
-        cp "$file" "$INSTALL_DIR/"
-        if [[ $? -ne 0 ]]; then
+        
+        # Create target directory if needed
+        mkdir -p "$(dirname "$target_file")"
+        
+        # Copy file
+        if cp "$file" "$target_file"; then
+            echo "Copied: $file"
+            ((copied_files++))
+            
+            # Make shell scripts executable
+            if [[ "$file" == *.sh ]] && [[ "$file" != *.sh.disabled ]]; then
+                chmod +x "$target_file" || {
+                    print_error "Failed to set executable permissions on $file"
+                    return 1
+                }
+            fi
+        else
             print_error "Failed to copy $file"
             return 1
         fi
-    done
+    done <<< "$tracked_files"
     
-    # Copy modules if they exist
-    if [[ -d "modules" ]]; then
-        cp -r modules/* "$INSTALL_DIR/modules/"
-        if [[ $? -ne 0 ]]; then
-            print_error "Failed to copy modules"
-            return 1
-        fi
-        
-        # Make enabled modules (.sh) executable
-        find "$INSTALL_DIR/modules" -name "*.sh" -exec chmod +x {} \;
-    fi
-    
-    # Make core scripts executable
-    chmod +x "$INSTALL_DIR"/*.sh
-    if [[ $? -ne 0 ]]; then
-        print_error "Failed to set executable permissions"
+    if [[ $copied_files -eq 0 ]]; then
+        print_error "No files were copied"
         return 1
     fi
     
+    print_success "Copied $copied_files files"
     return 0
 }
 
@@ -141,6 +279,28 @@ install() {
     
     # Check dependencies
     check_dependencies || return 1
+    
+    # Check if we're in a git repository
+    if ! git rev-parse --is-inside-work-tree &>/dev/null; then
+        print_error "Not running from a git repository"
+        print_error "The deploy script requires a git repository to track file changes"
+        return 1
+    fi
+    
+    # Check for existing deployment and modifications
+    if check_existing_deployment; then
+        print_warning "Existing deployment detected"
+        echo "This is normal - files will be updated in place"
+        echo
+        
+        # Check for extra files
+        local extra_files
+        extra_files=$(detect_extra_files)
+        
+        if [[ -n "$extra_files" ]]; then
+            handle_extra_files "$extra_files"
+        fi
+    fi
     
     # Create directories
     create_directories || return 1
