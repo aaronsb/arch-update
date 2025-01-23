@@ -154,10 +154,9 @@ main() {
     cleanup_sudo
 
     print_header "${CLOCK_ICON} SYSTEM UPDATE COMPLETED AT $(date)"
-    
     # Final status
     echo "$LOGFILE"
-    
+
     return 0
 }
 
