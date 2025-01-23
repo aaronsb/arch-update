@@ -1,5 +1,8 @@
 #!/bin/bash
 
+# Global variables
+LOG_FILE=""
+
 # Color definitions
 RED="$(tput setaf 1)"
 GREEN="$(tput setaf 2)"
@@ -26,31 +29,47 @@ KEY_ICON=''
 DISABLED_ICON='󰈉'
 
 # Logging functions
+log_message() {
+    local message="$1"
+    local level="${2:-INFO}"  # Default level is INFO
+    local timestamp=$(date +'%Y-%m-%d %H:%M:%S')
+    
+    # Output to console with colors
+    echo -e "$message"
+    
+    # If LOG_FILE is set, write to log without colors
+    if [[ -n "$LOG_FILE" ]]; then
+        # Strip ANSI codes and prepend timestamp
+        echo -e "$message" | sed -E 's/\x1B\[[0-9;]*[mGKH]//g' | \
+            sed "s/^/$timestamp [$level] /" | \
+            sudo tee -a "$LOG_FILE" >/dev/null
+    fi
+}
+
 print_header() {
-    echo -e "\n${BLUE}${BOLD}════════════════════════════════════════════════════════════════${NC}"
-    echo -e "${CYAN}${BOLD} $1 ${NC}"
-    echo -e "${BLUE}${BOLD}════════════════════════════════════════════════════════════════${NC}\n"
+    local message="\n${BLUE}${BOLD}════════════════════════════════════════════════════════════════${NC}\n${CYAN}${BOLD} $1 ${NC}\n${BLUE}${BOLD}════════════════════════════════════════════════════════════════${NC}\n"
+    log_message "$message" "HEADER"
 }
 
 print_status() {
-    echo -e "${CYAN}$1 ${NC}$2"
+    log_message "${CYAN}$1 ${NC}$2" "STATUS"
 }
 
 print_success() {
-    echo -e "${GREEN}${SUCCESS_ICON} $1${NC}"
+    log_message "${GREEN}${SUCCESS_ICON} $1${NC}" "SUCCESS"
 }
 
 print_warning() {
-    echo -e "${YELLOW}${WARNING_ICON} $1${NC}"
+    log_message "${YELLOW}${WARNING_ICON} $1${NC}" "WARNING"
 }
 
 print_error() {
-    echo -e "${RED}${ERROR_ICON} $1${NC}"
+    log_message "${RED}${ERROR_ICON} $1${NC}" "ERROR"
     return 1
 }
 
 print_disabled() {
-    echo -e "${MAGENTA}${DISABLED_ICON} $1${NC}"
+    log_message "${MAGENTA}${DISABLED_ICON} $1${NC}" "DISABLED"
 }
 
 # System check functions
@@ -117,10 +136,8 @@ strip_ansi() {
 
 # Educational message functions
 print_info_box() {
-    local message="$1"
-    echo -e "\n${BLUE}${BOLD}════════════════════════════════════════════════════════════════${NC}"
-    echo -e "${GREEN} ${INFO_ICON} ${message} ${NC}"
-    echo -e "${BLUE}${BOLD}════════════════════════════════════════════════════════════════${NC}\n"
+    local message="\n${BLUE}${BOLD}════════════════════════════════════════════════════════════════${NC}\n${GREEN} ${INFO_ICON} ${message} ${NC}\n${BLUE}${BOLD}════════════════════════════════════════════════════════════════${NC}\n"
+    log_message "$message" "INFO"
 }
 
 print_section_box() {
@@ -128,53 +145,60 @@ print_section_box() {
     local content="$2"
     local link="$3"
     
-    # Print title header
-    echo -e "\n${BLUE}${BOLD}════════════════════════════════════════════════════════════════${NC}"
-    echo -e "${CYAN}${BOLD} ${title} ${NC}"
-    echo -e "${BLUE}${BOLD}════════════════════════════════════════════════════════════════${NC}"
+    # Build the complete message
+    local message="\n${BLUE}${BOLD}════════════════════════════════════════════════════════════════${NC}\n"
+    message+="${CYAN}${BOLD} ${title} ${NC}\n"
+    message+="${BLUE}${BOLD}════════════════════════════════════════════════════════════════${NC}\n"
     
-    # Print content in light green
-    echo "$content" | while IFS= read -r line; do
-        echo -e "${GREEN} ${INFO_ICON} ${line} ${NC}"
-    done
+    # Add content
+    while IFS= read -r line; do
+        message+="${GREEN} ${INFO_ICON} ${line} ${NC}\n"
+    done <<< "$content"
     
-    # Print link if provided
+    # Add link if provided
     if [ -n "$link" ]; then
-        echo -e "${GREEN} 🔗 Learn more: ${NC}"
-        echo -e "${GREEN}    ${link} ${NC}"
+        message+="${GREEN} 🔗 Learn more: ${NC}\n"
+        message+="${GREEN}    ${link} ${NC}\n"
     fi
     
-    # Close the box
-    echo -e "${BLUE}${BOLD}════════════════════════════════════════════════════════════════${NC}\n"
+    # Add closing line
+    message+="${BLUE}${BOLD}════════════════════════════════════════════════════════════════${NC}\n"
+    
+    log_message "$message" "SECTION"
 }
 
 # Initialize logging for the current session
 setup_logging() {
-    local log_dir="/tmp/update-arch/logs"
+    local log_dir="/var/log/system_updates"
     local max_logs=5
     
     # Create log directory if it doesn't exist
-    mkdir -p "$log_dir"
-    
-    # Set up log rotation
-    if [ "$(ls -1 "$log_dir" | wc -l)" -ge "$max_logs" ]; then
-        oldest_log=$(ls -1t "$log_dir" | tail -n 1)
-        rm "$log_dir/$oldest_log"
+    if [ ! -d "$log_dir" ]; then
+        sudo mkdir -p "$log_dir"
+        sudo chown root:root "$log_dir"
+        sudo chmod 755 "$log_dir"
     fi
     
-    # Create new log file with shorter name
-    local timestamp=$(date +'%y%m%d%H%M')
-    local logfile="$log_dir/up$timestamp.log"
-    touch "$logfile"
+    # Create new log file with timestamp
+    local timestamp=$(date +'%Y-%m-%d')
+    LOG_FILE="$log_dir/$timestamp.log"
     
-    # Set up logging with color handling - strip ANSI codes from log file
-    exec 1> >(tee >(strip_ansi >> "$logfile"))
-    exec 2> >(tee >(strip_ansi >> "$logfile" >&2))
-    export TERM=xterm-256color  # Ensure proper color support
+    # Create and set permissions for new log file
+    sudo touch "$LOG_FILE"
+    sudo chown root:root "$LOG_FILE"
+    sudo chmod 644 "$LOG_FILE"
     
-    print_status "${LOG_ICON}" "Log file created: ${BOLD}$logfile${NC}"
+    # Initialize the log file with a header
+    {
+        echo "System Update Log - $(date)"
+        echo "----------------------------------------"
+    } | sudo tee "$LOG_FILE" >/dev/null
+
+    # Print initial message
+    log_message "${CYAN}${LOG_ICON} Log file created: ${BOLD}$LOG_FILE${NC}" "INFO"
     
-    echo "$logfile"
+    # Return the logfile path
+    echo "$LOG_FILE"
 }
 
 # Module type validation
