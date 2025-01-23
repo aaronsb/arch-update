@@ -194,10 +194,18 @@ copy_files() {
         # Skip empty lines
         [[ -z "$file" ]] && continue
         
-        # Determine target directory
+        # Skip files that don't exist (might be renamed with .disabled)
+        [[ ! -f "$file" ]] && continue
+        
+        # Determine target directory and filename
         if [[ "$file" == modules/* ]]; then
             target_dir="$INSTALL_DIR/modules"
-            target_file="$INSTALL_DIR/$file"
+            # If source is .disabled, keep that extension in target
+            if [[ "$file" == *.disabled ]]; then
+                target_file="$INSTALL_DIR/$file"
+            else
+                target_file="$INSTALL_DIR/${file%.*}.sh"
+            fi
         else
             target_dir="$INSTALL_DIR"
             target_file="$INSTALL_DIR/$file"
