@@ -103,6 +103,13 @@ Modules (in modules/):
      - Detailed output about user-level updates
      - Examples: oh-my-posh, custom AUR packages, user tools
 
+- Example modules are provided but disabled by default:
+  - 10-example-system.sh.disabled: Template for system modules
+  - 50-example-user.sh.disabled: Template for user modules
+  - Study these examples when creating new modules
+  - Remove .disabled extension to activate them
+  - Or copy them to create new modules
+
 - Each module provides verbose, educational output to help users:
   - Understand what maintenance tasks are being performed
   - Learn system administration best practices
