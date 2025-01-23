@@ -150,7 +150,7 @@ print_section_box() {
 
 # Initialize logging for the current session
 setup_logging() {
-    local log_dir="$HOME/.local/share/update-arch/logs"
+    local log_dir="/tmp/update-arch/logs"
     local max_logs=5
     
     # Create log directory if it doesn't exist
@@ -172,7 +172,7 @@ setup_logging() {
     exec 2> >(tee >(strip_ansi >> "$logfile" >&2))
     export TERM=xterm-256color  # Ensure proper color support
     
-    print_status "${LOG_ICON}" "Created log file: ${BOLD}$logfile${NC}"
+    print_status "${LOG_ICON}" "Log file created: ${BOLD}$logfile${NC}"
     
     echo "$logfile"
 }

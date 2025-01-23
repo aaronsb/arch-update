@@ -156,8 +156,7 @@ main() {
     print_header "${CLOCK_ICON} SYSTEM UPDATE COMPLETED AT $(date)"
     
     # Final status
-    print_status "${LOG_ICON}" "Log saved to: ${BOLD}$LOGFILE${NC}"
-    print_status "${INFO_ICON}" "Please review the log for any potential issues"
+    echo "$LOGFILE"
     
     return 0
 }
