@@ -56,13 +56,13 @@ run_update() {
     
     if ! sudo pacman -Syu --noconfirm; then
         print_error "Failed to update system packages"
-        print_info_box "Common issues:\n- Network connectivity problems\n- Mirror synchronization issues\n- Disk space limitations"
+        print_info_box "Common issues:\n• Network connectivity problems\n• Mirror synchronization issues\n• Disk space limitations"
         return 1
     fi
     
     # Show post-update tips
     print_success "System packages updated successfully"
-    print_info_box "Some updates may require system restart\nCheck pacman logs: /var/log/pacman.log"
+    print_info_box "• Some updates may require system restart\n• Check pacman logs: /var/log/pacman.log"
     return 0
 }
 

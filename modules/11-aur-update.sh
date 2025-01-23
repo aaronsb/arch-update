@@ -51,7 +51,7 @@ run_update() {
         return 1
     fi
     
-    print_info_box "Using AUR helper: $aur_helper\nSupported helpers: yay, paru"
+    print_info_box "• Using AUR helper: $aur_helper\n• Supported helpers: yay, paru"
     
     # Check for updates first
     print_status "${SYNC_ICON}" "Checking for AUR updates..."
@@ -66,13 +66,13 @@ run_update() {
     
     if ! $aur_helper -Sua --noconfirm; then
         print_error "Failed to update AUR packages"
-        print_info_box "Common issues:\n- Network connectivity problems\n- Build dependencies missing\n- Package maintainer changes"
+        print_info_box "Common issues:\n• Network connectivity problems\n• Build dependencies missing\n• Package maintainer changes"
         return 1
     fi
     
     # Show post-update information
     print_success "AUR packages updated successfully"
-    print_info_box "Review installed AUR packages: $aur_helper -Qm\nCheck package issues: https://aur.archlinux.org"
+    print_info_box "• Review installed AUR packages: $aur_helper -Qm\n• Check package issues: https://aur.archlinux.org"
     return 0
 }
 

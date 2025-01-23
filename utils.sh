@@ -106,37 +106,42 @@ set_error_handlers() {
     trap 'handle_error "Script error on line $LINENO" 1' ERR
 }
 
-# Educational message functions
-print_info_box() {
-    local message="\n${BLUE}${BOLD}════════════════════════════════════════════════════════════════${NC}\n${GREEN} ${INFO_ICON} ${message} ${NC}\n${BLUE}${BOLD}════════════════════════════════════════════════════════════════${NC}\n"
-    echo -e "$message"
-}
-
-print_section_box() {
+# Educational and informational message functions
+print_education() {
     local title="$1"
     local content="$2"
     local link="$3"
     
-    # Build the complete message
-    local message="\n${BLUE}${BOLD}════════════════════════════════════════════════════════════════${NC}\n"
-    message+="${CYAN}${BOLD} ${title} ${NC}\n"
-    message+="${BLUE}${BOLD}════════════════════════════════════════════════════════════════${NC}\n"
+    # Print title
+    echo -e "\n${CYAN}${BOLD}${title}${NC}"
     
-    # Add content
+    # Print content with indentation
     while IFS= read -r line; do
-        message+="${GREEN} ${INFO_ICON} ${line} ${NC}\n"
+        echo -e " ${GREEN}${INFO_ICON} ${line}${NC}"
     done <<< "$content"
     
     # Add link if provided
     if [ -n "$link" ]; then
-        message+="${GREEN} 🔗 Learn more: ${NC}\n"
-        message+="${GREEN}    ${link} ${NC}\n"
+        echo -e " ${GREEN}🔗 Learn more: ${link}${NC}"
     fi
     
-    # Add closing line
-    message+="${BLUE}${BOLD}════════════════════════════════════════════════════════════════${NC}\n"
+    echo
+}
+
+print_info_box() {
+    local content="$1"
     
-    echo -e "$message"
+    # Print content with subtle formatting
+    echo -e "\n${BLUE}> ${NC}${BOLD}Important:${NC}"
+    while IFS= read -r line; do
+        echo -e "  ${BLUE}•${NC} ${line}"
+    done <<< "$content"
+    echo
+}
+
+print_section_box() {
+    # Redirect to new education function for better readability
+    print_education "$1" "$2" "$3"
 }
 
 # Module type validation
