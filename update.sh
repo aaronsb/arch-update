@@ -50,25 +50,30 @@ main() {
     # Phase 1: System Modules (10-49)
     print_header "${SUDO_ICON} SYSTEM UPDATE MODULES"
     while IFS= read -r module; do
+        if [[ ! -x "$module" ]]; then
+            continue
+        fi
+        
+        # Check if this is a disabled module
         if [[ "$module" == *.disabled ]]; then
             print_disabled "System module disabled: $(basename "$module")"
             continue
-        elif [[ -x "$module" ]]; then
-            print_status "${SUDO_ICON}" "Running system module with elevated privileges: $(basename "$module")"
-            if ! source "$module"; then
-                print_warning "Module $(basename "$module") failed"
-                continue
-            fi
-            if ! validate_module_type "$module" "$MODULE_TYPE" "system"; then
-                exit 1
-            fi
-            if ! check_supported; then
-                print_status "${INFO_ICON}" "Module $(basename "$module") not supported on this system"
-                continue
-            fi
-            if ! run_update; then
-                print_warning "Module $(basename "$module") update failed"
-            fi
+        fi
+        
+        print_status "${SUDO_ICON}" "Running system module with elevated privileges: $(basename "$module")"
+        if ! source "$module"; then
+            print_warning "Module $(basename "$module") failed"
+            continue
+        fi
+        if ! validate_module_type "$module" "$MODULE_TYPE" "system"; then
+            exit 1
+        fi
+        if ! check_supported; then
+            print_status "${INFO_ICON}" "Module $(basename "$module") not supported on this system"
+            continue
+        fi
+        if ! run_update; then
+            print_warning "Module $(basename "$module") update failed"
         fi
     done < <(find "$SCRIPT_DIR/modules" -name "[1-4][0-9]-*.sh*" | sort)
     kill $SUDO_REFRESH_PID
@@ -76,25 +81,30 @@ main() {
     # Phase 2: User Modules (50-89)
     print_header "${USER_ICON} USER UPDATE MODULES"
     while IFS= read -r module; do
+        if [[ ! -x "$module" ]]; then
+            continue
+        fi
+        
+        # Check if this is a disabled module
         if [[ "$module" == *.disabled ]]; then
             print_disabled "User module disabled: $(basename "$module")"
             continue
-        elif [[ -x "$module" ]]; then
-            print_status "${USER_ICON}" "Running user module: $(basename "$module")"
-            if ! source "$module"; then
-                print_warning "Module $(basename "$module") failed"
-                continue
-            fi
-            if ! validate_module_type "$module" "$MODULE_TYPE" "user"; then
-                exit 1
-            fi
-            if ! check_supported; then
-                print_status "${INFO_ICON}" "Module $(basename "$module") not supported on this system"
-                continue
-            fi
-            if ! run_update; then
-                print_warning "Module $(basename "$module") update failed"
-            fi
+        fi
+        
+        print_status "${USER_ICON}" "Running user module: $(basename "$module")"
+        if ! source "$module"; then
+            print_warning "Module $(basename "$module") failed"
+            continue
+        fi
+        if ! validate_module_type "$module" "$MODULE_TYPE" "user"; then
+            exit 1
+        fi
+        if ! check_supported; then
+            print_status "${INFO_ICON}" "Module $(basename "$module") not supported on this system"
+            continue
+        fi
+        if ! run_update; then
+            print_warning "Module $(basename "$module") update failed"
         fi
     done < <(find "$SCRIPT_DIR/modules" -name "[5-8][0-9]-*.sh*" | sort)
     kill $SUDO_REFRESH_PID
@@ -102,25 +112,30 @@ main() {
     # Phase 3: Post-update Status Modules (90+)
     print_header "${INFO_ICON} POST-UPDATE STATUS"
     while IFS= read -r module; do
+        if [[ ! -x "$module" ]]; then
+            continue
+        fi
+        
+        # Check if this is a disabled module
         if [[ "$module" == *.disabled ]]; then
             print_disabled "Status module disabled: $(basename "$module")"
             continue
-        elif [[ -x "$module" ]]; then
-            print_status "${INFO_ICON}" "Running status module: $(basename "$module")"
-            if ! source "$module"; then
-                print_warning "Module $(basename "$module") failed"
-                continue
-            fi
-            if ! validate_module_type "$module" "$MODULE_TYPE" "status"; then
-                exit 1
-            fi
-            if ! check_supported; then
-                print_status "${INFO_ICON}" "Module $(basename "$module") not supported on this system"
-                continue
-            fi
-            if ! run_update; then
-                print_warning "Module $(basename "$module") update failed"
-            fi
+        fi
+        
+        print_status "${INFO_ICON}" "Running status module: $(basename "$module")"
+        if ! source "$module"; then
+            print_warning "Module $(basename "$module") failed"
+            continue
+        fi
+        if ! validate_module_type "$module" "$MODULE_TYPE" "status"; then
+            exit 1
+        fi
+        if ! check_supported; then
+            print_status "${INFO_ICON}" "Module $(basename "$module") not supported on this system"
+            continue
+        fi
+        if ! run_update; then
+            print_warning "Module $(basename "$module") update failed"
         fi
     done < <(find "$SCRIPT_DIR/modules" -name "9[0-9]-*.sh*" | sort)
     kill $SUDO_REFRESH_PID
