@@ -88,8 +88,15 @@ Core:
 - **update.sh**: Main script orchestrator
 - **system-check.sh**: Pre-update system health verification
 - **package-update.sh**: Package management operations
-- **utils.sh**: Core utilities, logging setup, and helper functions
-- **utils.sh**: Shared functions and utilities
+- **utils.sh**: Core utilities including:
+  - Logging setup and helper functions
+  - Color-coded status messages
+  - Educational message boxes with:
+    - Blue borders for visual structure
+    - Cyan headers for section titles
+    - Light green content for educational messages
+    - Nerdfont icons for visual cues
+    - Learn-more links to documentation
 
 Modules (in modules/):
 - Named with priority prefix like udev rules (e.g., 10-pacman.sh)

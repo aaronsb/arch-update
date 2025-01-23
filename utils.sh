@@ -115,68 +115,37 @@ strip_ansi() {
     sed -E 's/\x1B\[[0-9;]*[mGKH]//g'
 }
 
-# Box drawing functions for educational content
+# Educational message functions
 print_info_box() {
     local message="$1"
-    local width=60
-    local padding="    "
-    
-    # Split message into lines that fit within width
-    local wrapped_text=""
-    local line=""
-    for word in $message; do
-        local temp="$line $word"
-        if [ ${#temp} -gt $((width - 4)) ]; then
-            wrapped_text+="$line\n"
-            line="$padding$word"
-        else
-            line="$temp"
-        fi
-    done
-    wrapped_text+="$line"
-    
-    # Draw the box
-    local line_chars=$(printf '%.0s─' $(seq 1 $((width-2))))
-    echo -e "\n${CYAN}┌${line_chars}┐${NC}"
-    echo -e "$wrapped_text" | while IFS= read -r line; do
-        echo -e "${CYAN}│${NC} ${INFO_ICON} ${line}${CYAN} │${NC}"
-    done
-    echo -e "${CYAN}└${line_chars}┘${NC}\n"
+    echo -e "\n${BLUE}${BOLD}════════════════════════════════════════════════════════════════${NC}"
+    echo -e "${GREEN} ${INFO_ICON} ${message} ${NC}"
+    echo -e "${BLUE}${BOLD}════════════════════════════════════════════════════════════════${NC}\n"
 }
 
 print_section_box() {
     local title="$1"
     local content="$2"
     local link="$3"
-    local width=60
-    local padding="    "
     
-    # Calculate title padding for centering
-    local title_padding=$(( (width - ${#title} - 4) / 2 ))
+    # Print title header
+    echo -e "\n${BLUE}${BOLD}════════════════════════════════════════════════════════════════${NC}"
+    echo -e "${CYAN}${BOLD} ${title} ${NC}"
+    echo -e "${BLUE}${BOLD}════════════════════════════════════════════════════════════════${NC}"
     
-    # Draw the box
-    local title_line_chars=$(printf '%.0s─' $(seq 1 $((width-${#title}-7))))
-    echo -e "\n${CYAN}┌─── $title ${title_line_chars}┐${NC}"
-    
-    # Print content lines
-    echo -e "$content" | while IFS= read -r line; do
-        if [ -n "$line" ]; then
-            echo -e "${CYAN}│${NC} ${INFO_ICON} ${line}${padding:${#line}}${CYAN} │${NC}"
-        else
-            local space_chars=$(printf '%.0s ' $(seq 1 $((width-2))))
-            echo -e "${CYAN}│${space_chars}│${NC}"
-        fi
+    # Print content in light green
+    echo "$content" | while IFS= read -r line; do
+        echo -e "${GREEN} ${INFO_ICON} ${line} ${NC}"
     done
     
-    # Add link if provided
+    # Print link if provided
     if [ -n "$link" ]; then
-        echo -e "${CYAN}│${NC}${padding}${padding}${CYAN} │${NC}"
-        echo -e "${CYAN}│${NC} 🔗 Learn more:${padding}${CYAN} │${NC}"
-        echo -e "${CYAN}│${NC}    $link${padding:${#link}}${CYAN} │${NC}"
+        echo -e "${GREEN} 🔗 Learn more: ${NC}"
+        echo -e "${GREEN}    ${link} ${NC}"
     fi
     
-    local bottom_line_chars=$(printf '%.0s─' $(seq 1 $((width-2))))
-    echo -e "${CYAN}└${bottom_line_chars}┘${NC}\n"
+    # Close the box
+    echo -e "${BLUE}${BOLD}════════════════════════════════════════════════════════════════${NC}\n"
 }
 
 # Initialize logging for the current session
