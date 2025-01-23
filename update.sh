@@ -150,6 +150,25 @@ main() {
     return 0
 }
 
+# Function to configure terminal preferences
+configure_terminal() {
+    local config_dir="$HOME/.config/update-arch"
+    
+    # Ensure config directory exists
+    mkdir -p "$config_dir"
+    
+    # Run terminal configuration
+    if ! configure_terminal_preferences; then
+        print_error "Failed to configure terminal preferences"
+        return 1
+    fi
+    
+    # Reinitialize icons with new settings
+    setup_icons
+    
+    return 0
+}
+
 # Help text
 show_help() {
     cat << EOF
@@ -160,6 +179,7 @@ ${BOLD}Usage:${NC} update-arch [OPTIONS]
 ${BOLD}Options:${NC}
     ${GREEN}-h, --help${NC}        Show this help message
     ${GREEN}--version${NC}         Show version information
+    ${GREEN}--configure-terminal${NC} Configure terminal preferences
     ${GREEN}--dry-run${NC}         Show what would be updated without making changes
     ${GREEN}--run${NC}             Run the update process
 
@@ -194,6 +214,10 @@ case "$1" in
     --version)
         show_version
         exit 0
+        ;;
+    --configure-terminal)
+        configure_terminal
+        exit $?
         ;;
     --dry-run)
         # TODO: Implement dry run functionality

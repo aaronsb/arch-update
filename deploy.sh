@@ -169,11 +169,66 @@ check_existing_deployment() {
 
 # Function to set up installation directories
 create_directories() {
-    mkdir -p "$INSTALL_DIR" "$BIN_DIR" "$INSTALL_DIR/modules"
+    mkdir -p "$INSTALL_DIR" "$BIN_DIR" "$INSTALL_DIR/modules" "$HOME/.config/update-arch"
     if [[ $? -ne 0 ]]; then
         print_error "Failed to create required directories"
         return 1
     fi
+    return 0
+}
+
+# Function to configure terminal preferences
+configure_terminal_preferences() {
+    local config_file="$HOME/.config/update-arch/terminal.conf"
+    local detected_term reply
+    
+    # Run terminal detection
+    detected_term=$(detect_terminal)
+    
+    # Create or update config file
+    cat > "$config_file" << EOL
+# Terminal configuration for update-arch
+# Last updated: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
+DETECTED_TERMINAL="$detected_term"
+PREFERRED_TERMINAL="auto"
+FORCE_ASCII_ICONS="false"
+LAST_DETECTION_TIME="$(date +%s)"
+EOL
+    
+    print_success "Terminal detected: $detected_term"
+    echo
+    print_warning "Would you like to customize terminal preferences? [y/N]"
+    read -r reply
+    
+    case "$reply" in
+        [Yy]*)
+            echo
+            print_warning "Force ASCII icons (no Nerd Font icons)? [y/N]"
+            read -r reply
+            case "$reply" in
+                [Yy]*)
+                    sed -i 's/FORCE_ASCII_ICONS="false"/FORCE_ASCII_ICONS="true"/' "$config_file"
+                    print_success "ASCII icons enabled"
+                    ;;
+            esac
+            
+            echo
+            print_warning "Override detected terminal? [y/N]"
+            read -r reply
+            case "$reply" in
+                [Yy]*)
+                    echo "Enter preferred terminal (e.g., vscode, kitty, auto):"
+                    read -r preferred
+                    sed -i "s/PREFERRED_TERMINAL=\"auto\"/PREFERRED_TERMINAL=\"$preferred\"/" "$config_file"
+                    print_success "Preferred terminal set to: $preferred"
+                    ;;
+            esac
+            ;;
+    esac
+    
+    echo
+    print_success "Terminal preferences configured"
+    print_info_box "You can reconfigure anytime with: update-arch --configure-terminal"
     return 0
 }
 
@@ -277,13 +332,21 @@ uninstall() {
         print_success "Removed install directory"
     fi
     
+    # Remove terminal configuration
+    if [[ -f "$HOME/.config/update-arch/terminal.conf" ]]; then
+        rm -f "$HOME/.config/update-arch/terminal.conf"
+        print_success "Removed terminal configuration"
+        # Try to remove config directory if empty
+        rmdir "$HOME/.config/update-arch" 2>/dev/null || true
+    fi
+    
     print_success "Uninstallation complete"
     return 0
 }
 
 # Function to perform installation
 install() {
-    echo "Installing update-arch..."
+    print_header "Installing update-arch..."
     
     # Check dependencies
     check_dependencies || return 1
@@ -294,6 +357,10 @@ install() {
         print_error "The deploy script requires a git repository to track file changes"
         return 1
     fi
+    
+    # Run terminal detection test first
+    print_header "Terminal Detection"
+    test_terminal_detection
     
     # Check for existing deployment and modifications
     if check_existing_deployment; then
@@ -318,6 +385,9 @@ install() {
     
     # Create symlink
     create_symlink || return 1
+    
+    # Configure terminal preferences
+    configure_terminal_preferences || return 1
     
     local version
     version=$(get_version)

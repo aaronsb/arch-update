@@ -44,24 +44,65 @@ declare -A ASCII_ICONS=(
 # Active icons array
 declare -A ICONS
 
+# Load terminal configuration
+load_terminal_config() {
+    local config_file="$HOME/.config/update-arch/terminal.conf"
+    if [[ -f "$config_file" ]]; then
+        # Source the config file
+        source "$config_file"
+        
+        # Check if we should redetect (30 days)
+        if [[ -n "$LAST_DETECTION_TIME" ]]; then
+            local now current_time last_time diff
+            current_time=$(date +%s)
+            last_time=$LAST_DETECTION_TIME
+            diff=$((current_time - last_time))
+            
+            # If more than 30 days, trigger redetection
+            if [[ $diff -gt 2592000 ]]; then
+                return 1
+            fi
+        fi
+        return 0
+    fi
+    return 1
+}
+
 # Font support detection
 detect_font_support() {
-    # Check if user has explicitly set preference
-    if [[ -n "$FORCE_ASCII_ICONS" ]]; then
-        return 1
+    # Load config if available
+    if load_terminal_config; then
+        # Use configured preference if available
+        if [[ "$FORCE_ASCII_ICONS" == "true" ]]; then
+            return 1
+        fi
     fi
     
     # Check for common terminals known to support Nerd Fonts
-    if [[ "$TERM_PROGRAM" == "vscode" ]] || \
-       [[ "$TERM_PROGRAM" == "iTerm.app" ]] || \
-       [[ -n "$KITTY_WINDOW_ID" ]] || \
-       [[ -n "$ALACRITTY_LOG" ]]; then
-        return 0
-    fi
-    
-    # Test if terminal can display a Nerd Font character
-    if echo -ne "󰋼" | grep -q "󰋼"; then
-        return 0
+    if [[ "$PREFERRED_TERMINAL" != "auto" && -n "$PREFERRED_TERMINAL" ]]; then
+        # Use preferred terminal setting
+        case "$PREFERRED_TERMINAL" in
+            "vscode"|"iterm2"|"kitty"|"alacritty"|"wezterm")
+                return 0
+                ;;
+            *)
+                return 1
+                ;;
+        esac
+    else
+        # Auto-detect support
+        if [[ "$TERM_PROGRAM" == "vscode" ]] || \
+           [[ "$TERM_PROGRAM" == "iTerm.app" ]] || \
+           [[ -n "$KITTY_WINDOW_ID" ]] || \
+           [[ -n "$ALACRITTY_LOG" ]] || \
+           [[ -n "$WEZTERM_PANE" ]]; then
+            return 0
+        fi
+        
+        # Test if terminal can display a Nerd Font character
+        if echo -ne "󰋼" | grep -q "󰋼"; then
+            return 0
+        fi
     fi
     
     return 1
@@ -82,6 +123,83 @@ setup_icons() {
 
 # Initialize icons immediately
 setup_icons
+
+# Terminal detection
+detect_terminal() {
+    local terminal_info=()
+    
+    # Check for multiplexers first (they wrap other terminals)
+    [[ -n "$TMUX" ]] && terminal_info+=("tmux")
+    [[ -n "$STY" ]] && terminal_info+=("screen")
+    
+    # Check for specific terminal emulators
+    if [[ "$TERM_PROGRAM" == "vscode" ]]; then
+        terminal_info+=("vscode")
+    elif [[ "$TERM_PROGRAM" == "iTerm.app" ]]; then
+        terminal_info+=("iterm2")
+    elif [[ -n "$KITTY_WINDOW_ID" ]]; then
+        terminal_info+=("kitty")
+    elif [[ -n "$ALACRITTY_LOG" ]]; then
+        terminal_info+=("alacritty")
+    elif [[ -n "$GNOME_TERMINAL_SERVICE" ]]; then
+        terminal_info+=("gnome-terminal")
+    elif [[ -n "$KONSOLE_VERSION" ]]; then
+        terminal_info+=("konsole")
+    elif [[ -n "$TERMINATOR_UUID" ]]; then
+        terminal_info+=("terminator")
+    elif [[ "$TERM" == "xterm"* ]]; then
+        terminal_info+=("xterm")
+    elif [[ -n "$WEZTERM_PANE" ]]; then
+        terminal_info+=("wezterm")
+    elif [[ -n "$TILIX_ID" ]]; then
+        terminal_info+=("tilix")
+    fi
+    
+    # If no specific terminal was detected but we're in a multiplexer
+    if [[ ${#terminal_info[@]} -eq 1 ]] && [[ "${terminal_info[0]}" =~ ^(tmux|screen)$ ]]; then
+        # Add a generic terminal indicator
+        terminal_info+=("terminal")
+    fi
+    
+    # If no terminal was detected at all
+    if [[ ${#terminal_info[@]} -eq 0 ]]; then
+        terminal_info+=("unknown")
+    fi
+    
+    # Join all detected terminals with '+'
+    local IFS="+"
+    echo "${terminal_info[*]}"
+}
+
+# Test terminal detection
+test_terminal_detection() {
+    local term_info=$(detect_terminal)
+    print_status "${ICONS[info]}" "Detected terminal(s): $term_info"
+    
+    # Parse the terminal string
+    local terms
+    IFS='+' read -ra terms <<< "$term_info"
+    
+    # Print detailed information
+    for term in "${terms[@]}"; do
+        case "$term" in
+            "tmux") print_info_box "Running inside tmux multiplexer" ;;
+            "screen") print_info_box "Running inside GNU Screen multiplexer" ;;
+            "vscode") print_info_box "Running in Visual Studio Code integrated terminal" ;;
+            "iterm2") print_info_box "Running in iTerm2 terminal" ;;
+            "kitty") print_info_box "Running in Kitty terminal" ;;
+            "alacritty") print_info_box "Running in Alacritty terminal" ;;
+            "gnome-terminal") print_info_box "Running in GNOME Terminal" ;;
+            "konsole") print_info_box "Running in KDE Konsole" ;;
+            "terminator") print_info_box "Running in Terminator" ;;
+            "xterm") print_info_box "Running in XTerm" ;;
+            "wezterm") print_info_box "Running in WezTerm" ;;
+            "tilix") print_info_box "Running in Tilix" ;;
+            "terminal") print_info_box "Running in an unspecified terminal" ;;
+            "unknown") print_info_box "Unable to detect specific terminal type" ;;
+        esac
+    done
+}
 
 print_header() {
     local message="\n${BLUE}${BOLD}════════════════════════════════════════════════════════════════${NC}\n${CYAN}${BOLD} $1 ${NC}\n${BLUE}${BOLD}════════════════════════════════════════════════════════════════${NC}\n"
