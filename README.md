@@ -91,11 +91,16 @@ Core:
 - **utils.sh**: Core utilities including:
   - Logging setup and helper functions
   - Color-coded status messages
+  - Smart icon system:
+    - Automatic Nerd Font detection
+    - ASCII fallback for compatibility
+    - Material Design icons when supported
+    - Override via FORCE_ASCII_ICONS=1
   - Educational message boxes with:
     - Blue borders for visual structure
     - Cyan headers for section titles
     - Light green content for educational messages
-    - Nerdfont icons for visual cues
+    - Adaptive icons for visual cues
     - Learn-more links to documentation
 
 Modules (in modules/):

@@ -10,19 +10,78 @@ CYAN="$(tput setaf 6)"
 NC="$(tput sgr0)" # No Color
 BOLD="$(tput bold)"
 
-# Icons (nerdfonts)
-INFO_ICON='' 
-SUCCESS_ICON='' 
-WARNING_ICON='' 
-ERROR_ICON='' 
-PACKAGE_ICON='' 
-TRASH_ICON='' 
-CLOCK_ICON='' 
-SYNC_ICON='󰁪'
-NETWORK_ICON=''
-DISK_ICON=''
-KEY_ICON=''
-DISABLED_ICON='󰈉'
+# Icon Sets
+declare -A NERDFONT_ICONS=(
+    [info]='󰋼'
+    [success]='󰗠'
+    [warning]='󰀦'
+    [error]='󰝤'
+    [package]='󰏖'
+    [trash]='󰩺'
+    [clock]='󰥔'
+    [sync]='󰓦'
+    [network]='󰤨'
+    [disk]='󰋊'
+    [key]='󰌋'
+    [disabled]='󰜺'
+)
+
+declare -A ASCII_ICONS=(
+    [info]='(i)'
+    [success]='[√]'
+    [warning]='[!]'
+    [error]='[×]'
+    [package]='[#]'
+    [trash]='[~]'
+    [clock]='[@]'
+    [sync]='[S]'
+    [network]='[N]'
+    [disk]='[D]'
+    [key]='[K]'
+    [disabled]='[-]'
+)
+
+# Active icons array
+declare -A ICONS
+
+# Font support detection
+detect_font_support() {
+    # Check if user has explicitly set preference
+    if [[ -n "$FORCE_ASCII_ICONS" ]]; then
+        return 1
+    fi
+    
+    # Check for common terminals known to support Nerd Fonts
+    if [[ "$TERM_PROGRAM" == "vscode" ]] || \
+       [[ "$TERM_PROGRAM" == "iTerm.app" ]] || \
+       [[ -n "$KITTY_WINDOW_ID" ]] || \
+       [[ -n "$ALACRITTY_LOG" ]]; then
+        return 0
+    fi
+    
+    # Test if terminal can display a Nerd Font character
+    if echo -ne "󰋼" | grep -q "󰋼"; then
+        return 0
+    fi
+    
+    return 1
+}
+
+# Initialize icons based on detected support
+setup_icons() {
+    if detect_font_support; then
+        for key in "${!NERDFONT_ICONS[@]}"; do
+            ICONS[$key]="${NERDFONT_ICONS[$key]}"
+        done
+    else
+        for key in "${!ASCII_ICONS[@]}"; do
+            ICONS[$key]="${ASCII_ICONS[$key]}"
+        done
+    fi
+}
+
+# Initialize icons immediately
+setup_icons
 
 print_header() {
     local message="\n${BLUE}${BOLD}════════════════════════════════════════════════════════════════${NC}\n${CYAN}${BOLD} $1 ${NC}\n${BLUE}${BOLD}════════════════════════════════════════════════════════════════${NC}\n"
@@ -30,29 +89,29 @@ print_header() {
 }
 
 print_status() {
-    echo -e "${CYAN}$1 ${NC}$2"
+    echo -e "${CYAN}${1:+$1 }${NC}$2"
 }
 
 print_success() {
-    echo -e "${GREEN}${SUCCESS_ICON} $1${NC}"
+    echo -e "${GREEN}${ICONS[success]} $1${NC}"
 }
 
 print_warning() {
-    echo -e "${YELLOW}${WARNING_ICON} $1${NC}"
+    echo -e "${YELLOW}${ICONS[warning]} $1${NC}"
 }
 
 print_error() {
-    echo -e "${RED}${ERROR_ICON} $1${NC}"
+    echo -e "${RED}${ICONS[error]} $1${NC}"
     return 1
 }
 
 print_disabled() {
-    echo -e "${MAGENTA}${DISABLED_ICON} $1${NC}"
+    echo -e "${MAGENTA}${ICONS[disabled]} $1${NC}"
 }
 
 # System check functions
 check_network() {
-    print_status "${NETWORK_ICON}" "Checking network connectivity..."
+    print_status "${ICONS[network]}" "Checking network connectivity..."
     
     # List of servers to try, in order of preference
     local servers=("archlinux.org" "google.com" "cloudflare.com")
@@ -70,7 +129,7 @@ check_network() {
 }
 
 check_disk_space() {
-    print_status "${DISK_ICON}" "Checking available disk space..."
+    print_status "${ICONS[disk]}" "Checking available disk space..."
     local min_space=1000000  # 1GB in KB
     local available=$(df -k / | awk 'NR==2 {print $4}')
     
@@ -117,7 +176,7 @@ print_education() {
     
     # Print content with indentation
     while IFS= read -r line; do
-        echo -e " ${GREEN}${INFO_ICON} ${line}${NC}"
+        echo -e " ${GREEN}${ICONS[info]} ${line}${NC}"
     done <<< "$content"
     
     # Add link if provided
