@@ -14,13 +14,13 @@
 - [x] 91-systemd-status: Service status checks
 
 ## Remaining Modules to Standardize
-- [ ] 12-orphans-cleanup: Orphaned package cleanup
-- [ ] 13-cache-cleanup: Package cache management
-- [ ] 20-flatpak-update: Flatpak package updates
+- [x] 12-orphans-cleanup: Orphaned package cleanup
+- [x] 13-cache-cleanup: Package cache management
+- [x] 20-flatpak-update: Flatpak package updates
 
-## Example Modules to Review
-- [ ] 10-example-system: Consider removing or updating
-- [ ] 50-example-user: Consider removing or updating
+## Example Modules Review
+- [x] 10-example-system: Updated with current standards
+- [x] 50-example-user: Updated with current standards
 
 ## Standardization Checklist for Each Module
 1. Script Structure:
