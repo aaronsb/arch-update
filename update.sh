@@ -70,7 +70,7 @@ main() {
                 print_warning "Module $(basename "$module") update failed"
             fi
         fi
-    done < <(find "$SCRIPT_DIR/modules" -name "[1-4][0-9]-*.sh" | sort)
+    done < <(find "$SCRIPT_DIR/modules" -name "[1-4][0-9]-*.sh*" | sort)
     kill $SUDO_REFRESH_PID
 
     # Phase 2: User Modules (50-89)
@@ -96,7 +96,7 @@ main() {
                 print_warning "Module $(basename "$module") update failed"
             fi
         fi
-    done < <(find "$SCRIPT_DIR/modules" -name "[5-8][0-9]-*.sh" | sort)
+    done < <(find "$SCRIPT_DIR/modules" -name "[5-8][0-9]-*.sh*" | sort)
     kill $SUDO_REFRESH_PID
 
     # Phase 3: Post-update Status Modules (90+)
@@ -122,7 +122,7 @@ main() {
                 print_warning "Module $(basename "$module") update failed"
             fi
         fi
-    done < <(find "$SCRIPT_DIR/modules" -name "9[0-9]-*.sh" | sort)
+    done < <(find "$SCRIPT_DIR/modules" -name "9[0-9]-*.sh*" | sort)
     kill $SUDO_REFRESH_PID
 
     print_header "${CLOCK_ICON} SYSTEM UPDATE COMPLETED AT $(date)"
