@@ -23,6 +23,7 @@ SYNC_ICON='󰁪'
 NETWORK_ICON=''
 DISK_ICON=''
 KEY_ICON=''
+DISABLED_ICON='󰈉'
 
 # Logging functions
 print_header() {
@@ -46,6 +47,10 @@ print_warning() {
 print_error() {
     echo -e "${RED}${ERROR_ICON} $1${NC}"
     return 1
+}
+
+print_disabled() {
+    echo -e "${MAGENTA}${DISABLED_ICON} $1${NC}"
 }
 
 # System check functions

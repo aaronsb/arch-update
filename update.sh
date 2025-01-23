@@ -50,7 +50,10 @@ main() {
     # Phase 1: System Modules (10-49)
     print_header "${SUDO_ICON} SYSTEM UPDATE MODULES"
     while IFS= read -r module; do
-        if [[ -x "$module" ]]; then
+        if [[ "$module" == *.disabled ]]; then
+            print_disabled "System module disabled: $(basename "$module")"
+            continue
+        elif [[ -x "$module" ]]; then
             print_status "${SUDO_ICON}" "Running system module with elevated privileges: $(basename "$module")"
             if ! source "$module"; then
                 print_warning "Module $(basename "$module") failed"
@@ -73,7 +76,10 @@ main() {
     # Phase 2: User Modules (50-89)
     print_header "${USER_ICON} USER UPDATE MODULES"
     while IFS= read -r module; do
-        if [[ -x "$module" ]]; then
+        if [[ "$module" == *.disabled ]]; then
+            print_disabled "User module disabled: $(basename "$module")"
+            continue
+        elif [[ -x "$module" ]]; then
             print_status "${USER_ICON}" "Running user module: $(basename "$module")"
             if ! source "$module"; then
                 print_warning "Module $(basename "$module") failed"
@@ -96,7 +102,10 @@ main() {
     # Phase 3: Post-update Status Modules (90+)
     print_header "${INFO_ICON} POST-UPDATE STATUS"
     while IFS= read -r module; do
-        if [[ -x "$module" ]]; then
+        if [[ "$module" == *.disabled ]]; then
+            print_disabled "Status module disabled: $(basename "$module")"
+            continue
+        elif [[ -x "$module" ]]; then
             print_status "${INFO_ICON}" "Running status module: $(basename "$module")"
             if ! source "$module"; then
                 print_warning "Module $(basename "$module") failed"
