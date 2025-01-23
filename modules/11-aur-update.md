@@ -1,56 +1,55 @@
-# AUR Update Module
+# AUR Package Update Module
 
-Handles package updates from the Arch User Repository (AUR) using available AUR helpers.
+## Overview
+This system module manages package updates from the Arch User Repository (AUR) using available AUR helpers. It provides automated AUR package management with educational information about the AUR ecosystem.
 
-## Priority: 11 (System Module)
+## Type
+System Module (10-19 priority range)
 
-This module runs in the system maintenance range (10-19) as it handles package updates from the AUR, which often include important system tools and applications.
-
-## Purpose
-
-This module manages updates for packages installed from the AUR. It:
-- Detects and uses available AUR helpers (yay or paru)
-- Performs AUR package updates
-- Provides clear status updates during the process
-- Handles errors gracefully with informative messages
-
-## Requirements
-
-One of the following AUR helpers:
-- yay
-- paru
+## Dependencies
+- yay or paru (AUR helpers)
+- base-devel (for building packages)
+- git (for cloning AUR repositories)
 
 ## Operation
+1. Detects available AUR helper (yay or paru)
+2. Provides educational information about AUR
+3. Checks for available updates
+4. Downloads and builds updated packages
+5. Installs updates with dependency handling
+6. Provides post-update information
 
-1. Verifies system requirements
-   - Checks for supported AUR helper availability
-   - Determines which helper to use
+## Error Handling
+- Validates AUR helper availability
+- Checks for update availability
+- Handles build and installation failures
+- Provides troubleshooting information
+- Returns appropriate exit codes
 
-2. Performs update
-   - Uses detected AUR helper
-   - Updates only AUR packages (-Sua flag)
-   - Provides real-time status
-   - Reports success or failure
+## Safety Checks
+- Verifies AUR helper installation
+- Confirms update availability before proceeding
+- Uses --noconfirm for automated operation
+- Handles common failure scenarios
 
-## Features
+## Output
+The module provides:
+- Educational information about AUR
+- AUR helper detection results
+- Update availability status
+- Build and installation progress
+- Common troubleshooting tips
+- Post-update package management guidance
 
-- Automatic AUR helper detection
-- Support for multiple AUR helpers
-- Clear progress indication
-- Error handling and reporting
+## Notes
+- Does not require root privileges (uses sudo when needed)
+- Supports multiple AUR helpers
+- Handles package building and installation
+- Provides links to AUR website for issues
+- Includes educational content about AUR ecosystem
 
-## Related Arch Wiki Pages
-
-- [AUR helpers](https://wiki.archlinux.org/title/AUR_helpers)
-- [Arch User Repository](https://wiki.archlinux.org/title/Arch_User_Repository)
-
-## Enable/Disable
-
-To enable:
-```bash
-mv 11-aur-update.disabled 11-aur-update.sh && chmod +x 11-aur-update.sh
-```
-
-To disable:
-```bash
-mv 11-aur-update.sh 11-aur-update.disabled
+## Related Documentation
+- [Arch Wiki - AUR](https://wiki.archlinux.org/title/Arch_User_Repository)
+- [AUR Web Interface](https://aur.archlinux.org)
+- [AUR Helpers](https://wiki.archlinux.org/title/AUR_helpers)
+- [Makepkg](https://wiki.archlinux.org/title/Makepkg)

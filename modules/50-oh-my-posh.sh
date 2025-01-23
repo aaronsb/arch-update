@@ -27,18 +27,32 @@ run_update() {
     
     # Check current version before update
     print_status "${SYNC_ICON}" "Checking current version..."
-    current_version=$(oh-my-posh version)
+    if ! current_version=$(oh-my-posh version 2>/dev/null); then
+        print_error "Failed to get current version"
+        return 1
+    fi
     print_status "${INFO_ICON}" "Current version: ${current_version}"
+    
+    # Check for config file
+    config_file="${HOME}/.config/oh-my-posh/config.json"
+    if [[ -f "${config_file}" ]]; then
+        print_status "${INFO_ICON}" "Found configuration at: ${config_file}"
+    else
+        print_warning "No custom configuration found at: ${config_file}"
+    fi
     
     # Perform update
     print_status "${SYNC_ICON}" "Updating oh-my-posh..."
     if ! sudo oh-my-posh upgrade; then
-        print_warning "Failed to update oh-my-posh"
+        print_error "Failed to update oh-my-posh"
         return 1
     fi
     
     # Show new version and educational info
-    new_version=$(oh-my-posh version)
+    if ! new_version=$(oh-my-posh version 2>/dev/null); then
+        print_error "Failed to get new version"
+        return 1
+    fi
     if [[ "${current_version}" != "${new_version}" ]]; then
         print_success "Updated from ${current_version} to ${new_version}"
         print_status "${INFO_ICON}" "Review changelog: https://github.com/JanDeDobbeleer/oh-my-posh/releases"
@@ -47,9 +61,10 @@ run_update() {
     fi
     
     # Additional educational information
-    print_status "${INFO_ICON}" "Your prompt configuration is stored in:"
-    print_status "${INFO_ICON}" "~/.config/oh-my-posh/config.json"
-    print_status "${INFO_ICON}" "Backup this file to preserve your customizations"
+    print_status "${INFO_ICON}" "Configuration tips:"
+    print_status "${INFO_ICON}" "- Backup your config file regularly"
+    print_status "${INFO_ICON}" "- Check themes at: https://ohmyposh.dev/docs/themes"
+    print_status "${INFO_ICON}" "- Test changes with: oh-my-posh init bash --config path/to/config.json"
     
     return 0
 }

@@ -1,53 +1,53 @@
-# Pacman Update Module
+# Pacman System Update Module
 
-Handles core system package updates using the pacman package manager.
+## Overview
+This core system module handles package updates from official Arch Linux repositories using pacman. It provides comprehensive package management with educational information about the update process.
 
-## Priority: 10 (System Module)
+## Type
+System Module (10-19 priority range)
 
-This module runs in the system maintenance range (10-19) as it handles essential package updates from official Arch Linux repositories.
-
-## Purpose
-
-This module manages the core system package updates through pacman. It:
-- Checks for available updates using checkupdates
-- Performs system package updates via pacman
-- Provides clear status updates during the process
-- Handles errors gracefully with informative messages
-
-## Requirements
-
+## Dependencies
 - pacman (core package manager)
-- sudo access (for system updates)
+- sudo (for privileged operations)
 - checkupdates (optional, from pacman-contrib)
 
 ## Operation
+1. Verifies pacman availability
+2. Provides educational information about package management
+3. Checks for available updates using checkupdates if available
+4. Verifies package manager is not locked
+5. Performs full system update
+6. Provides post-update information and tips
 
-1. Verifies system requirements
-   - Checks for pacman availability
-   - Validates sudo access
+## Error Handling
+- Validates pacman installation
+- Checks for package manager lock file
+- Handles checkupdates failures gracefully
+- Provides detailed error information for common issues
+- Returns appropriate exit codes
 
-2. Checks for updates
-   - Uses checkupdates if available
-   - Shows list of pending updates
-   - Skips update if system is current
+## Safety Checks
+- Uses checkupdates to safely check for updates
+- Verifies package manager availability
+- Checks for existing package operations
+- Prevents concurrent package operations
 
-3. Performs update
-   - Executes pacman -Syu
-   - Provides real-time status
-   - Reports success or failure
+## Output
+The module provides:
+- Educational information about pacman
+- List of available updates
+- Update progress and results
+- Common troubleshooting tips
+- Post-update recommendations
 
-## Related Arch Wiki Pages
+## Notes
+- Requires root privileges for updates
+- Uses --noconfirm for automated operation
+- May require system restart after updates
+- Logs all operations to pacman.log
+- Links to official documentation for further reading
 
-- [Pacman](https://wiki.archlinux.org/title/Pacman)
-- [System maintenance](https://wiki.archlinux.org/title/System_maintenance)
-
-## Enable/Disable
-
-To enable:
-```bash
-mv 10-pacman-update.disabled 10-pacman-update.sh && chmod +x 10-pacman-update.sh
-```
-
-To disable:
-```bash
-mv 10-pacman-update.sh 10-pacman-update.disabled
+## Related Documentation
+- [Arch Wiki - Pacman](https://wiki.archlinux.org/title/Pacman)
+- [System Maintenance](https://wiki.archlinux.org/title/System_maintenance)
+- [Package Management](https://wiki.archlinux.org/title/Package_management)

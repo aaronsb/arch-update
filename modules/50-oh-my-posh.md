@@ -1,66 +1,45 @@
-# oh-my-posh Update Module
+# Oh My Posh Update Module
 
-Updates and maintains the oh-my-posh shell prompt customization tool.
+## Overview
+This user module manages updates for oh-my-posh, a custom prompt engine that works with any shell. It handles version checking, updates, and provides educational information about configuration management.
 
-## Priority: 50 (User Module)
+## Type
+User Module (50-79 priority range)
 
-This module runs in the user maintenance range (50-79) as it manages a user-specific shell customization tool.
-
-## Purpose
-
-This module handles the maintenance of oh-my-posh, a custom prompt engine that enhances your shell experience. It provides:
-- Automated version updates
-- Configuration management guidance
-- Educational information about shell customization
-
-## Educational Value
-
-Users will learn about:
-- Shell prompt customization tools
-- Version management for user tools
-- Configuration file locations and backup practices
-- Best practices for maintaining user customizations
-
-## Requirements
-
-- oh-my-posh must be installed
-- sudo access (for upgrade command)
-- Internet access (for updates)
+## Dependencies
+- oh-my-posh
+- sudo (for upgrade process)
 
 ## Operation
-
-1. Displays educational information about oh-my-posh
-   - Explains the tool's purpose
-   - Provides documentation links
-   - Emphasizes update importance
-
+1. Verifies oh-my-posh installation
 2. Checks current version
-   - Shows installed version
-   - Prepares for version comparison
+3. Verifies configuration file existence
+4. Performs update using sudo
+5. Verifies successful update
+6. Provides configuration tips and documentation links
 
-3. Performs update process
-   - Executes upgrade command
-   - Shows version changes
-   - Links to changelog for updates
+## Error Handling
+- Checks for oh-my-posh installation
+- Validates version checking operations
+- Handles update failures gracefully
+- Returns appropriate exit codes
+- Redirects stderr to prevent error message pollution
 
-4. Provides configuration guidance
-   - Locates config files
-   - Explains backup importance
-   - Offers customization tips
+## Configuration
+- Default config location: ~/.config/oh-my-posh/config.json
+- Supports custom themes and configurations
+- Configuration changes require shell reload
 
-## Related Documentation
+## Output
+The module provides:
+- Current and new version information
+- Update status and results
+- Configuration file location and status
+- Educational tips for customization
+- Links to documentation and changelog
 
-- [oh-my-posh Official Docs](https://ohmyposh.dev/)
-- [GitHub Releases](https://github.com/JanDeDobbeleer/oh-my-posh/releases)
-- [Configuration Guide](https://ohmyposh.dev/docs/configuration/overview)
-
-## Enable/Disable
-
-To enable:
-```bash
-mv 50-oh-my-posh.disabled 50-oh-my-posh.sh && chmod +x 50-oh-my-posh.sh
-```
-
-To disable:
-```bash
-mv 50-oh-my-posh.sh 50-oh-my-posh.disabled
+## Notes
+- Requires sudo privileges for updates
+- Preserves user configuration during updates
+- Provides guidance for theme customization
+- Includes links to official documentation
