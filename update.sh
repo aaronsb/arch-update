@@ -36,14 +36,21 @@ main() {
         exit 1
     fi
     
-    # Keep sudo session alive
+    # Keep sudo session alive with proper cleanup
+    cleanup_sudo() {
+        if [[ -n "$SUDO_REFRESH_PID" ]]; then
+            kill $SUDO_REFRESH_PID 2>/dev/null || true
+        fi
+    }
+    trap cleanup_sudo EXIT
+
     ( while true; do sudo -v; sleep 60; done; ) &
     SUDO_REFRESH_PID=$!
     
     # Perform system health checks
     if ! check_system_health "$INSTALL_DIR"; then
         print_error "System health checks failed"
-        kill $SUDO_REFRESH_PID
+        cleanup_sudo
         exit 1
     fi
     
@@ -66,6 +73,8 @@ main() {
             continue
         fi
         if ! validate_module_type "$module" "$MODULE_TYPE" "system"; then
+            print_error "Module validation failed for $(basename "$module")"
+            cleanup_sudo
             exit 1
         fi
         if ! check_supported; then
@@ -76,7 +85,7 @@ main() {
             print_warning "Module $(basename "$module") update failed"
         fi
     done < <(find "$SCRIPT_DIR/modules" -name "[1-4][0-9]-*.sh*" | sort)
-    kill $SUDO_REFRESH_PID
+    cleanup_sudo
 
     # Phase 2: User Modules (50-89)
     print_header "${USER_ICON} USER UPDATE MODULES"
@@ -97,6 +106,8 @@ main() {
             continue
         fi
         if ! validate_module_type "$module" "$MODULE_TYPE" "user"; then
+            print_error "Module validation failed for $(basename "$module")"
+            cleanup_sudo
             exit 1
         fi
         if ! check_supported; then
@@ -107,7 +118,7 @@ main() {
             print_warning "Module $(basename "$module") update failed"
         fi
     done < <(find "$SCRIPT_DIR/modules" -name "[5-8][0-9]-*.sh*" | sort)
-    kill $SUDO_REFRESH_PID
+    cleanup_sudo
 
     # Phase 3: Post-update Status Modules (90+)
     print_header "${INFO_ICON} POST-UPDATE STATUS"
@@ -128,6 +139,8 @@ main() {
             continue
         fi
         if ! validate_module_type "$module" "$MODULE_TYPE" "status"; then
+            print_error "Module validation failed for $(basename "$module")"
+            cleanup_sudo
             exit 1
         fi
         if ! check_supported; then
@@ -138,7 +151,7 @@ main() {
             print_warning "Module $(basename "$module") update failed"
         fi
     done < <(find "$SCRIPT_DIR/modules" -name "9[0-9]-*.sh*" | sort)
-    kill $SUDO_REFRESH_PID
+    cleanup_sudo
 
     print_header "${CLOCK_ICON} SYSTEM UPDATE COMPLETED AT $(date)"
     

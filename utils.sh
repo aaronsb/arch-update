@@ -117,22 +117,22 @@ strip_ansi() {
 
 # Initialize logging for the current session
 setup_logging() {
-    local log_dir="/var/log/system_updates"
+    local log_dir="$HOME/.local/share/update-arch/logs"
     local max_logs=5
     
     # Create log directory if it doesn't exist
-    sudo mkdir -p "$log_dir"
+    mkdir -p "$log_dir"
     
     # Set up log rotation
     if [ "$(ls -1 "$log_dir" | wc -l)" -ge "$max_logs" ]; then
         oldest_log=$(ls -1t "$log_dir" | tail -n 1)
-        sudo rm "$log_dir/$oldest_log"
+        rm "$log_dir/$oldest_log"
     fi
     
     # Create new log file with shorter name
     local timestamp=$(date +'%y%m%d%H%M')
     local logfile="$log_dir/up$timestamp.log"
-    sudo touch "$logfile"
+    touch "$logfile"
     
     # Set up logging with color handling - strip ANSI codes from log file
     exec 1> >(tee >(strip_ansi >> "$logfile"))
