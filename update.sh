@@ -12,15 +12,11 @@ VERSION="0.2.0"
 source "$SCRIPT_DIR/utils.sh"
 source "$SCRIPT_DIR/system-check.sh"
 
-# Icons for privilege levels
-SUDO_ICON="🔐"
-USER_ICON="👤"
-
 # Set up error handling
 set_error_handlers
 
 main() {
-    print_header "${CLOCK_ICON} SYSTEM UPDATE STARTED AT $(date)"
+    print_header "${ICONS[clock]} SYSTEM UPDATE STARTED AT $(date)"
     
     # Establish sudo session
     sudo -v
@@ -48,7 +44,7 @@ main() {
     fi
     
     # Phase 1: System Modules (10-49)
-    print_header "${SUDO_ICON} SYSTEM UPDATE MODULES"
+    print_header "${ICONS[sudo]} SYSTEM UPDATE MODULES"
     while IFS= read -r module; do
         if [[ ! -x "$module" ]]; then
             continue
@@ -60,7 +56,7 @@ main() {
             continue
         fi
         
-        print_status "${SUDO_ICON}" "Running system module with elevated privileges: $(basename "$module")"
+        print_status "${ICONS[sudo]}" "Running system module with elevated privileges: $(basename "$module")"
         if ! source "$module"; then
             print_warning "Module $(basename "$module") failed"
             continue
@@ -71,7 +67,7 @@ main() {
             exit 1
         fi
         if ! check_supported; then
-            print_status "${INFO_ICON}" "Module $(basename "$module") not supported on this system"
+            print_status "${ICONS[info]}" "Module $(basename "$module") not supported on this system"
             continue
         fi
         if ! run_update; then
@@ -81,7 +77,7 @@ main() {
     cleanup_sudo
 
     # Phase 2: User Modules (50-89)
-    print_header "${USER_ICON} USER UPDATE MODULES"
+    print_header "${ICONS[user]} USER UPDATE MODULES"
     while IFS= read -r module; do
         if [[ ! -x "$module" ]]; then
             continue
@@ -93,7 +89,7 @@ main() {
             continue
         fi
         
-        print_status "${USER_ICON}" "Running user module: $(basename "$module")"
+        print_status "${ICONS[user]}" "Running user module: $(basename "$module")"
         if ! source "$module"; then
             print_warning "Module $(basename "$module") failed"
             continue
@@ -104,7 +100,7 @@ main() {
             exit 1
         fi
         if ! check_supported; then
-            print_status "${INFO_ICON}" "Module $(basename "$module") not supported on this system"
+            print_status "${ICONS[info]}" "Module $(basename "$module") not supported on this system"
             continue
         fi
         if ! run_update; then
@@ -114,7 +110,7 @@ main() {
     cleanup_sudo
 
     # Phase 3: Post-update Status Modules (90+)
-    print_header "${INFO_ICON} POST-UPDATE STATUS"
+    print_header "${ICONS[info]} POST-UPDATE STATUS"
     while IFS= read -r module; do
         if [[ ! -x "$module" ]]; then
             continue
@@ -126,7 +122,7 @@ main() {
             continue
         fi
         
-        print_status "${INFO_ICON}" "Running status module: $(basename "$module")"
+        print_status "${ICONS[info]}" "Running status module: $(basename "$module")"
         if ! source "$module"; then
             print_warning "Module $(basename "$module") failed"
             continue
@@ -137,7 +133,7 @@ main() {
             exit 1
         fi
         if ! check_supported; then
-            print_status "${INFO_ICON}" "Module $(basename "$module") not supported on this system"
+            print_status "${ICONS[info]}" "Module $(basename "$module") not supported on this system"
             continue
         fi
         if ! run_update; then
@@ -146,7 +142,7 @@ main() {
     done < <(find "$SCRIPT_DIR/modules" -name "9[0-9]-*.sh*" | sort)
     cleanup_sudo
 
-    print_header "${CLOCK_ICON} SYSTEM UPDATE COMPLETED AT $(date)"
+    print_header "${ICONS[clock]} SYSTEM UPDATE COMPLETED AT $(date)"
     return 0
 }
 

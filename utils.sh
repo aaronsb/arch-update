@@ -24,6 +24,8 @@ declare -A NERDFONT_ICONS=(
     [disk]='󰋊'
     [key]='󰌋'
     [disabled]='󰜺'
+    [sudo]='󰌆'
+    [user]='󰀄'
 )
 
 declare -A ASCII_ICONS=(
@@ -39,6 +41,8 @@ declare -A ASCII_ICONS=(
     [disk]='[D]'
     [key]='[K]'
     [disabled]='[-]'
+    [sudo]='[S]'
+    [user]='(☺)'
 )
 
 # Active icons array
