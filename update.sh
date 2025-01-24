@@ -239,6 +239,7 @@ ${BOLD}Options:${NC}
     ${GREEN}-h, --help${NC}        Show this help message
     ${GREEN}--version${NC}         Show version information
     ${GREEN}--configure-terminal${NC} Configure terminal preferences
+    ${GREEN}--create-module${NC}    Create a new module from template
     ${GREEN}--dry-run${NC}         Show what would be updated without making changes
     ${GREEN}--run${NC}             Run the update process
 
@@ -277,6 +278,10 @@ case "$1" in
     --configure-terminal)
         configure_terminal
         exit $?
+        ;;
+    --create-module)
+        shift # Remove --create-module from args
+        exec "${SCRIPT_DIR}/create-module.sh" "$@"
         ;;
     --dry-run)
         export DRY_RUN=1

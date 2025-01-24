@@ -189,15 +189,20 @@ mv XX-modulename.sh XX-modulename.disabled
 ```
 
 Create a new module:
-1. Copy the example module:
 ```bash
-cp modules/50-example.disabled modules/XX-yourmodule.sh
+update-arch --create-module -t [system|user|status]
 ```
-2. Edit the module implementation
-3. Make it executable:
-```bash
-chmod +x modules/XX-yourmodule.sh
-```
+This will:
+1. Automatically assign the next available number based on type:
+   - system: 10-49 range
+   - user: 50-89 range
+   - status: 90+ range
+2. Create both .sh and .md files from templates
+3. Make the module executable
+4. Guide you through:
+   - Module naming and description
+   - Git commit best practices
+   - Deployment instructions
 
 Each module must implement:
 - check_supported(): Returns 0 if module can run
