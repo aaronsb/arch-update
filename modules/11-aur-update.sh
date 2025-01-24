@@ -36,7 +36,7 @@ get_aur_helper() {
 
 # Run the update process
 run_update() {
-    print_header "${PACKAGE_ICON} UPDATING AUR PACKAGES"
+    print_header "${ICONS[package]} UPDATING AUR PACKAGES"
     
     # Educational output about AUR
     print_section_box \
@@ -54,15 +54,43 @@ run_update() {
     print_info_box "• Using AUR helper: $aur_helper\n• Supported helpers: yay, paru"
     
     # Check for updates first
-    print_status "${SYNC_ICON}" "Checking for AUR updates..."
-    if ! $aur_helper -Qum &>/dev/null; then
+    print_status "${ICONS[sync]}" "Checking for AUR updates..."
+    local updates
+    if [[ "$aur_helper" == "yay" ]]; then
+        updates=$(yay -Qum 2>/dev/null)
+    else
+        updates=$(paru -Qum 2>/dev/null)
+    fi
+    
+    if [ $? -ne 0 ]; then
+        print_error "Failed to check for AUR updates"
+        return 1
+    fi
+    
+    if [ -z "$updates" ]; then
         print_success "No AUR updates available"
         return 0
     fi
     
+    # Show available updates
+    print_status "${ICONS[package]}" "AUR updates available:"
+    echo "$updates"
+    
+    # In dry-run mode, just show what would be updated
+    if [[ -n "$DRY_RUN" ]]; then
+        local update_count=$(echo "$updates" | wc -l)
+        print_status "${ICONS[info]}" "Would update $update_count AUR package(s)"
+        print_status "${ICONS[info]}" "This would:"
+        print_status "${ICONS[info]}" "• Download updated PKGBUILD files"
+        print_status "${ICONS[info]}" "• Verify package integrity"
+        print_status "${ICONS[info]}" "• Build packages from source"
+        print_status "${ICONS[info]}" "• Install built packages"
+        return 0
+    fi
+    
     # Perform AUR update with detailed output
-    print_status "${SYNC_ICON}" "Running AUR updates..."
-    print_status "${INFO_ICON}" "This will download, build, and install AUR packages"
+    print_status "${ICONS[sync]}" "Running AUR updates..."
+    print_status "${ICONS[info]}" "This will download, build, and install AUR packages"
     
     if ! $aur_helper -Sua --noconfirm; then
         print_error "Failed to update AUR packages"

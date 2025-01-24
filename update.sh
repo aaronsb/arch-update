@@ -15,8 +15,50 @@ source "$SCRIPT_DIR/system-check.sh"
 # Set up error handling
 set_error_handlers
 
+# Function to confirm sudo usage in dry-run mode
+confirm_dry_run_sudo() {
+    echo -e "\n${MAGENTA}${BOLD}${ICONS[warning]} WARNING: Dry Run Mode requires sudo rights${NC}"
+    echo -e "${YELLOW}• While dry-run mode should not make any changes"
+    echo -e "• Modified or incorrect modules could potentially execute commands with SUDO elevation"
+    echo -e "• Review module code if concerned about security${NC}"
+    echo
+    echo -e "${CYAN}Press 'c' to continue, 'q' to quit${NC}"
+    
+    # Start countdown
+    local timeout=10
+    while [ $timeout -gt 0 ]; do
+        echo -ne "\r${YELLOW}Defaulting to quit in ${timeout} seconds...${NC}"
+        read -t 1 -n 1 input
+        if [ $? -eq 0 ]; then
+            case "$input" in
+                c|C)
+                    echo -e "\n\n${GREEN}Proceeding with dry run...${NC}\n"
+                    return 0
+                    ;;
+                q|Q)
+                    echo -e "\n\n${YELLOW}Exiting at user request${NC}"
+                    exit 0
+                    ;;
+            esac
+        fi
+        ((timeout--))
+    done
+    
+    echo -e "\n\n${YELLOW}Timeout reached, exiting${NC}"
+    exit 0
+}
+
 main() {
-    print_header "${ICONS[clock]} SYSTEM UPDATE STARTED AT $(date)"
+    if [[ -n "$DRY_RUN" ]]; then
+        echo -e "\n${MAGENTA}${BOLD}════════════════════════════════════════════════════════════════${NC}"
+        echo -e "${MAGENTA}${BOLD} ${ICONS[info]} DRY RUN MODE - NO CHANGES WILL BE MADE ${NC}"
+        echo -e "${MAGENTA}${BOLD}════════════════════════════════════════════════════════════════${NC}\n"
+        
+        # Confirm sudo usage in dry-run mode
+        confirm_dry_run_sudo
+    else
+        print_header "${ICONS[clock]} SYSTEM UPDATE STARTED AT $(date)"
+    fi
     
     # Establish sudo session
     sudo -v
@@ -56,7 +98,12 @@ main() {
             continue
         fi
         
-        print_status "${ICONS[sudo]}" "Running system module with elevated privileges: $(basename "$module")"
+        if [[ -n "$DRY_RUN" ]]; then
+            print_status "${ICONS[sudo]}" "Would run system module: $(basename "$module")"
+        else
+            print_status "${ICONS[sudo]}" "Running system module with elevated privileges: $(basename "$module")"
+        fi
+        
         if ! source "$module"; then
             print_warning "Module $(basename "$module") failed"
             continue
@@ -89,7 +136,12 @@ main() {
             continue
         fi
         
-        print_status "${ICONS[user]}" "Running user module: $(basename "$module")"
+        if [[ -n "$DRY_RUN" ]]; then
+            print_status "${ICONS[user]}" "Would run user module: $(basename "$module")"
+        else
+            print_status "${ICONS[user]}" "Running user module: $(basename "$module")"
+        fi
+        
         if ! source "$module"; then
             print_warning "Module $(basename "$module") failed"
             continue
@@ -122,7 +174,12 @@ main() {
             continue
         fi
         
-        print_status "${ICONS[info]}" "Running status module: $(basename "$module")"
+        if [[ -n "$DRY_RUN" ]]; then
+            print_status "${ICONS[info]}" "Would run status module: $(basename "$module")"
+        else
+            print_status "${ICONS[info]}" "Running status module: $(basename "$module")"
+        fi
+        
         if ! source "$module"; then
             print_warning "Module $(basename "$module") failed"
             continue
@@ -142,7 +199,13 @@ main() {
     done < <(find "$SCRIPT_DIR/modules" -name "9[0-9]-*.sh*" | sort)
     cleanup_sudo
 
-    print_header "${ICONS[clock]} SYSTEM UPDATE COMPLETED AT $(date)"
+    if [[ -n "$DRY_RUN" ]]; then
+        echo -e "\n${MAGENTA}${BOLD}════════════════════════════════════════════════════════════════${NC}"
+        echo -e "${MAGENTA}${BOLD} ${ICONS[info]} DRY RUN COMPLETED - NO CHANGES WERE MADE ${NC}"
+        echo -e "${MAGENTA}${BOLD}════════════════════════════════════════════════════════════════${NC}\n"
+    else
+        print_header "${ICONS[clock]} SYSTEM UPDATE COMPLETED AT $(date)"
+    fi
     return 0
 }
 
@@ -216,9 +279,9 @@ case "$1" in
         exit $?
         ;;
     --dry-run)
-        # TODO: Implement dry run functionality
-        echo "Dry run functionality not yet implemented"
-        exit 1
+        export DRY_RUN=1
+        main
+        exit $?
         ;;
     --run)
         main

@@ -1,16 +1,9 @@
 #!/bin/bash
 #
-# Orphaned Packages Cleanup (10-19 priority range)
-# Handles removal of orphaned packages to maintain system cleanliness
-#
-# This module identifies and removes packages that were installed as dependencies
-# but are no longer required by any installed package. This helps keep the system
-# clean and reduces disk usage by removing unnecessary packages.
-#
-# Safety: Creates a backup list of orphaned packages before removal
-# Rollback: Packages can be reinstalled from backup if needed
+# Orphaned Package Cleanup (10-19 priority range)
+# Removes packages that are no longer required by any other package
+# Provides educational information about package maintenance
 
-# Module type declaration
 MODULE_TYPE="system"
 
 # Source utils if not already sourced
@@ -24,52 +17,70 @@ check_supported() {
     return $?
 }
 
-# Backup orphaned packages list
-backup_orphans() {
-    local backup_dir="/tmp/update-scripts/orphans"
-    mkdir -p "$backup_dir"
-    echo "$1" > "$backup_dir/orphans-$(date +%Y%m%d-%H%M%S).txt"
-}
-
-# Run the update process
+# Run the cleanup process
 run_update() {
-    print_header "${TRASH_ICON} CHECKING FOR ORPHANED PACKAGES"
+    print_header "${ICONS[trash]} CLEANING ORPHANED PACKAGES"
     
     # Educational output about orphaned packages
     print_section_box \
         "About Orphaned Packages" \
-        "Orphaned packages are former dependencies no longer required by any installed package\nRemoving them helps maintain system cleanliness and reduces disk usage" \
-        "https://wiki.archlinux.org/title/Pacman#Removing_unused_packages"
+        "Orphaned packages are those no longer required as dependencies\nRemoving them helps maintain a clean system" \
+        "https://wiki.archlinux.org/title/Pacman/Tips_and_tricks#Removing_unused_packages"
     
-    # Find orphaned packages
-    local orphans=$(pacman -Qdtq)
+    # Check for orphaned packages
+    print_status "${ICONS[sync]}" "Checking for orphaned packages..."
+    local orphans=$(pacman -Qtdq)
+    
     if [ $? -ne 0 ]; then
-        print_error "Failed to check for orphaned packages: pacman query failed"
-        print_info_box "Please check if pacman database is locked or corrupted"
+        print_error "Failed to check for orphaned packages"
         return 1
     fi
     
-    # Handle orphaned packages if found
-    if [ ! -z "$orphans" ]; then
-        print_status "${INFO_ICON}" "Found orphaned packages:"
-        echo "$orphans"
-        
-        # Create backup before removal
-        print_info_box "Creating backup of orphaned packages list for safety\nBackup location: /tmp/update-scripts/orphans/"
-        backup_orphans "$orphans"
-        
-        print_status "${SYNC_ICON}" "Removing orphaned packages..."
-        if ! sudo pacman -Rns $orphans --noconfirm; then
-            print_error "Failed to remove orphaned packages: pacman removal failed"
-            print_info_box "Recovery Instructions:\n- Package list saved in /tmp/update-scripts/orphans/\n- To reinstall, use: pacman -S \$(cat /tmp/update-scripts/orphans/[backup-file])"
-            return 1
-        fi
-        print_success "Orphaned packages removed successfully"
-        print_info_box "Backup saved in /tmp/update-scripts/orphans/\nKeep this backup until you verify system stability"
-    else
+    if [ -z "$orphans" ]; then
         print_success "No orphaned packages found"
+        return 0
     fi
     
+    # Get detailed information about orphaned packages
+    print_status "${ICONS[package]}" "Found orphaned packages:"
+    local orphan_details=$(pacman -Qti $(echo "$orphans"))
+    echo "$orphan_details"
+    
+    # Calculate total size of orphaned packages
+    local total_size=0
+    while IFS= read -r pkg; do
+        local size=$(pacman -Qi "$pkg" | grep "Installed Size" | cut -d: -f2 | tr -d ' ')
+        if [[ $size =~ ^[0-9]+\.[0-9]+.MiB$ ]]; then
+            size=$(echo "$size" | cut -d. -f1)
+            total_size=$((total_size + size))
+        elif [[ $size =~ ^[0-9]+\.[0-9]+.KiB$ ]]; then
+            size=$(echo "$size" | cut -d. -f1)
+            total_size=$((total_size + (size / 1024)))
+        fi
+    done <<< "$orphans"
+    
+    # In dry-run mode, just show what would be removed
+    if [[ -n "$DRY_RUN" ]]; then
+        local orphan_count=$(echo "$orphans" | wc -l)
+        print_status "${ICONS[info]}" "Would remove $orphan_count orphaned package(s)"
+        print_status "${ICONS[info]}" "This would:"
+        print_status "${ICONS[info]}" "• Free approximately ${total_size}MB of disk space"
+        print_status "${ICONS[info]}" "• Remove packages no longer needed as dependencies"
+        print_status "${ICONS[info]}" "• Clean up package database entries"
+        return 0
+    fi
+    
+    # Remove orphaned packages
+    print_status "${ICONS[trash]}" "Removing orphaned packages..."
+    if ! sudo pacman -Rns $(echo "$orphans") --noconfirm; then
+        print_error "Failed to remove orphaned packages"
+        print_info_box "Common issues:\n• Package required by another package\n• File conflicts\n• Insufficient permissions"
+        return 1
+    fi
+    
+    # Show cleanup results
+    print_success "Successfully removed orphaned packages"
+    print_info_box "• Freed approximately ${total_size}MB of disk space\n• System is now cleaner and more maintainable"
     return 0
 }
 

@@ -18,7 +18,7 @@ check_supported() {
 
 # Run the update process
 run_update() {
-    print_header "${SYNC_ICON} UPDATING OH-MY-POSH"
+    print_header "${ICONS[sync]} UPDATING OH-MY-POSH"
     
     # Educational output about oh-my-posh
     print_section_box \
@@ -27,7 +27,7 @@ run_update() {
         "https://ohmyposh.dev/"
     
     # Check current version before update
-    print_status "${SYNC_ICON}" "Checking current version..."
+    print_status "${ICONS[sync]}" "Checking current version..."
     if ! current_version=$(oh-my-posh version 2>/dev/null); then
         print_error "Failed to get current version"
         return 1
@@ -42,8 +42,18 @@ run_update() {
         print_warning "No custom configuration found at: ${config_file}"
     fi
     
+    # In dry-run mode, just show what would be done
+    if [[ -n "$DRY_RUN" ]]; then
+        print_status "${ICONS[info]}" "Would attempt to upgrade oh-my-posh from version ${current_version}"
+        print_status "${ICONS[info]}" "This would:"
+        print_status "${ICONS[info]}" "• Download latest oh-my-posh release"
+        print_status "${ICONS[info]}" "• Replace current binary with new version"
+        print_status "${ICONS[info]}" "• Preserve existing configuration at ${config_file}"
+        return 0
+    fi
+    
     # Perform update
-    print_status "${SYNC_ICON}" "Updating oh-my-posh..."
+    print_status "${ICONS[sync]}" "Updating oh-my-posh..."
     if ! sudo oh-my-posh upgrade; then
         print_error "Failed to update oh-my-posh"
         return 1

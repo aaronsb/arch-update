@@ -1,16 +1,9 @@
 #!/bin/bash
 #
 # Package Cache Cleanup (10-19 priority range)
-# Handles cleaning of pacman package cache to free disk space
-#
-# This module manages the pacman package cache, removing old versions while keeping
-# the most recent ones. This helps maintain system performance by preventing
-# excessive disk usage from accumulated package files.
-#
-# Safety: Keeps last 3 versions of each package
-# Rollback: Recent versions remain available for downgrade if needed
+# Cleans old package cache to free disk space
+# Provides educational information about package cache maintenance
 
-# Module type declaration
 MODULE_TYPE="system"
 
 # Source utils if not already sourced
@@ -20,56 +13,62 @@ fi
 
 # Check if this module can run
 check_supported() {
-    command -v paccache &>/dev/null
+    command -v pacman &>/dev/null
     return $?
 }
 
-# Backup package list before cleanup
-backup_package_list() {
-    local backup_dir="/tmp/update-scripts/cache"
-    mkdir -p "$backup_dir"
-    pacman -Q > "$backup_dir/packages-$(date +%Y%m%d-%H%M%S).txt"
-}
-
-# Run the update process
+# Run the cleanup process
 run_update() {
-    print_header "${TRASH_ICON} CLEANING PACKAGE CACHE"
+    print_header "${ICONS[trash]} CLEANING PACKAGE CACHE"
     
     # Educational output about package cache
     print_section_box \
         "About Package Cache" \
-        "The package cache stores downloaded packages for possible rollbacks\nRegular cleanup prevents excessive disk usage while keeping recent versions" \
+        "Package cache stores downloaded packages for possible rollback\nRegular cleanup helps manage disk space" \
         "https://wiki.archlinux.org/title/Pacman#Cleaning_the_package_cache"
     
-    # Create backup of current package list
-    print_info_box "Creating backup of current package list for safety\nBackup location: /tmp/update-scripts/cache/"
-    backup_package_list
+    # Check current cache size and content
+    print_status "${ICONS[sync]}" "Analyzing package cache..."
+    local cache_dir="/var/cache/pacman/pkg"
+    local current_size=$(du -sh "$cache_dir" 2>/dev/null | cut -f1)
     
-    # Get initial cache size
-    local initial_size=$(du -sh /var/cache/pacman/pkg/ 2>/dev/null | cut -f1)
-    print_status "${INFO_ICON}" "Current package cache size: $initial_size"
-    
-    # Clean package cache
-    print_status "${SYNC_ICON}" "Cleaning package cache (keeping last 3 versions)..."
-    if ! sudo paccache -r; then
-        print_error "Failed to clean package cache: paccache removal failed"
-        print_info_box "Common issues:\n- Pacman is currently running\n- Cache directory is locked\n- Insufficient permissions"
+    if [ ! -d "$cache_dir" ]; then
+        print_error "Package cache directory not found"
         return 1
     fi
     
-    # Remove all cached versions of uninstalled packages
-    print_status "${SYNC_ICON}" "Removing cached versions of uninstalled packages..."
-    if ! sudo paccache -ruk0; then
-        print_warning "Failed to remove uninstalled package cache: paccache uninstalled cleanup failed"
-        print_warning "This is non-critical, continuing with cleanup..."
+    # Count packages and calculate sizes
+    local total_packages=$(ls -1 "$cache_dir"/*.pkg.tar.* 2>/dev/null | wc -l)
+    local uninstalled_packages=$(pacman -Qdtq | wc -l)
+    local old_versions=$(ls -1 "$cache_dir" | grep -v "$(pacman -Q | awk '{print $1"-"$2}' | sed 's/-[^-]*$/-/' | tr '\n' '|' | sed 's/|$//')" | wc -l)
+    
+    print_info_box "Current cache status:\n• Total size: $current_size\n• Total packages: $total_packages\n• Old versions: $old_versions"
+    
+    # In dry-run mode, show what would be cleaned
+    if [[ -n "$DRY_RUN" ]]; then
+        print_status "${ICONS[info]}" "Would clean package cache:"
+        print_status "${ICONS[info]}" "• Current cache size: $current_size"
+        print_status "${ICONS[info]}" "• Would remove all but the latest version of each package"
+        print_status "${ICONS[info]}" "• Approximately $old_versions package(s) would be removed"
+        print_status "${ICONS[info]}" "This would:"
+        print_status "${ICONS[info]}" "• Free up significant disk space"
+        print_status "${ICONS[info]}" "• Keep latest version of each package for potential rollback"
+        print_status "${ICONS[info]}" "• Remove old and unneeded package versions"
+        return 0
     fi
     
-    # Get final cache size
-    local final_size=$(du -sh /var/cache/pacman/pkg/ 2>/dev/null | cut -f1)
-    local saved_space=$(echo "$initial_size $final_size" | awk '{print $1-$2}')
-    print_info_box "Package Cache Cleanup Summary:\n- Initial size: $initial_size\n- Final size: $final_size\n- Space freed: $saved_space\n- Backup saved in /tmp/update-scripts/cache/\n\nNote: Last 3 versions of each package are kept for safety"
+    # Perform cache cleanup
+    print_status "${ICONS[trash]}" "Cleaning package cache..."
+    if ! sudo paccache -r; then
+        print_error "Failed to clean package cache"
+        print_info_box "Common issues:\n• Insufficient permissions\n• Disk write errors\n• Cache lock issues"
+        return 1
+    fi
     
-    print_success "Package cache cleaned successfully"
+    # Calculate space saved
+    local new_size=$(du -sh "$cache_dir" 2>/dev/null | cut -f1)
+    print_success "Successfully cleaned package cache"
+    print_info_box "Results:\n• Previous size: $current_size\n• Current size: $new_size\n• Latest version of each package retained"
     return 0
 }
 

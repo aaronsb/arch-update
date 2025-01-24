@@ -19,7 +19,7 @@ check_supported() {
 
 # Run the update process
 run_update() {
-    print_header "${PACKAGE_ICON} UPDATING SYSTEM PACKAGES"
+    print_header "${ICONS[package]} UPDATING SYSTEM PACKAGES"
     
     # Educational output about package management
     print_section_box \
@@ -29,30 +29,46 @@ run_update() {
     
     # Check for updates without modifying the system
     if command -v checkupdates &>/dev/null; then
-        print_status "${SYNC_ICON}" "Checking for updates..."
+        print_status "${ICONS[sync]}" "Checking for updates..."
         local updates=$(checkupdates 2>/dev/null)
         if [ $? -ne 0 ]; then
-            print_warning "Failed to check updates, proceeding with direct update"
+            if [[ -n "$DRY_RUN" ]]; then
+                print_warning "Failed to check updates in dry-run mode"
+                return 1
+            else
+                print_warning "Failed to check updates, proceeding with direct update"
+            fi
         elif [ -z "$updates" ]; then
             print_success "System is up to date"
             return 0
         else
-            print_status "${PACKAGE_ICON}" "Updates available:"
+            print_status "${ICONS[package]}" "Updates available:"
             echo "$updates"
+            if [[ -n "$DRY_RUN" ]]; then
+                # In dry-run mode, just show what would be updated
+                local update_count=$(echo "$updates" | wc -l)
+                print_status "${ICONS[info]}" "Would update $update_count package(s)"
+                return 0
+            fi
         fi
+    fi
+    
+    # Don't proceed with actual updates in dry-run mode
+    if [[ -n "$DRY_RUN" ]]; then
+        return 0
     fi
     
     # Check if system is busy with package manager
     if [ -f "/var/lib/pacman/db.lck" ]; then
         print_error "Package manager is locked. Another package operation may be in progress."
-        print_status "${INFO_ICON}" "If no other package operations are running, remove the lock:"
-        print_status "${INFO_ICON}" "sudo rm /var/lib/pacman/db.lck"
+        print_status "${ICONS[info]}" "If no other package operations are running, remove the lock:"
+        print_status "${ICONS[info]}" "sudo rm /var/lib/pacman/db.lck"
         return 1
     fi
     
     # Perform system update with detailed output
-    print_status "${SYNC_ICON}" "Running system update..."
-    print_status "${INFO_ICON}" "This will synchronize package databases and update all packages"
+    print_status "${ICONS[sync]}" "Running system update..."
+    print_status "${ICONS[info]}" "This will synchronize package databases and update all packages"
     
     if ! sudo pacman -Syu --noconfirm; then
         print_error "Failed to update system packages"
