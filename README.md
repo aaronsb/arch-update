@@ -14,8 +14,8 @@ A modular system update script for Arch Linux that follows the Unix philosophy o
   - Handles multiple AUR helpers (yay/paru)
   - Fallback to pacman if AUR helper unavailable
 - **System Maintenance**:
-  - Cleans package cache
-  - Removes orphaned packages
+  - Cleans package cache (with automatic backups)
+  - Removes orphaned packages (with backup lists)
   - Manages system logs
   - Updates mirrors (if reflector is installed)
 - **Error Handling**: 
@@ -25,6 +25,12 @@ A modular system update script for Arch Linux that follows the Unix philosophy o
 - **Optional Updates**:
   - Flatpak packages (if installed)
   - oh-my-posh (if installed)
+- **User Interface**:
+  - Smart terminal detection
+  - Automatic Nerd Font detection
+  - ASCII fallback for compatibility
+  - Educational output with context
+  - Progress indicators and status messages
 
 ## Installation
 
@@ -62,16 +68,16 @@ update-arch
 
 To perform updates:
 ```bash
-update-arch --run --confirm
+update-arch --run
 ```
 
 Available options:
 ```bash
--h, --help      Show help message
---version       Show version information
---dry-run       Show what would be updated without changes
---run           Run the update process
---confirm       Required with --run for safety
+-h, --help              Show help message
+--version               Show version information
+--configure-terminal    Configure terminal preferences
+--dry-run              Show what would be updated without changes (planned)
+--run                  Run the update process
 ```
 
 The update process will:
@@ -105,7 +111,7 @@ Core:
 
 Modules (in modules/):
 - Named with priority prefix like udev rules (e.g., 10-pacman.sh)
-- Organized into two main categories:
+- Organized into three main categories:
   1. System Modules (10-29):
      - Core system maintenance tasks recommended by Arch Wiki
      - Educational output explaining each maintenance operation
@@ -114,6 +120,10 @@ Modules (in modules/):
      - User-specific customization maintenance
      - Detailed output about user-level updates
      - Examples: oh-my-posh, custom AUR packages, user tools
+  3. Status Modules (90-99):
+     - Post-update system status checks
+     - System service health verification
+     - System information display
 
 - Example modules are provided but disabled by default:
   - 10-example-system.sh.disabled: Template for system modules
@@ -126,6 +136,7 @@ Modules (in modules/):
   - Understand what maintenance tasks are being performed
   - Learn system administration best practices
   - Gain familiarity with Arch Linux maintenance
+  - Links to relevant documentation
 - Status controlled by extension:
   - .sh: Module is enabled
   - .disabled (or any non-.sh): Module is disabled
@@ -160,6 +171,11 @@ Optional:
    - Personal tool updates
    - Example: 50-oh-my-posh.sh
 
+3. Status Modules (90-99):
+   - System health verification
+   - Service status checks
+   - System information display
+
 ### Module Control
 
 Enable a module:
@@ -187,9 +203,45 @@ Each module must implement:
 - check_supported(): Returns 0 if module can run
 - run_update(): Performs the actual update
 
+## Terminal Features
+
+The script includes smart terminal handling:
+- Automatic terminal type detection
+- Support for common terminal emulators
+- Multiplexer detection (tmux, screen)
+- Configurable preferences
+- Icon set selection based on capabilities
+
+### Terminal Configuration
+
+Configure terminal preferences:
+```bash
+update-arch --configure-terminal
+```
+
+This allows you to:
+- Force ASCII icons if needed
+- Set preferred terminal type
+- Override auto-detection
+- Configure update frequency
+
 ## Logging
 
 Logs are stored in `/var/log/system_updates/` with automatic rotation (keeps last 5 logs).
+
+## Backup Features
+
+The script automatically creates backups during maintenance operations:
+
+1. Package Management:
+   - Orphaned package lists backed up before removal
+   - Package cache state preserved before cleaning
+   - Backup location: /tmp/update-scripts/
+
+2. System Updates:
+   - Package lists saved before major updates
+   - AUR package state preserved
+   - Flatpak update logs maintained
 
 ## Troubleshooting
 
@@ -208,17 +260,32 @@ Logs are stored in `/var/log/system_updates/` with automatic rotation (keeps las
    - Script will automatically fall back to pacman
    - Install yay or paru for AUR support
 
+4. **Terminal Display Issues**
+   - Use --configure-terminal to adjust display settings
+   - Set FORCE_ASCII_ICONS=1 for compatibility mode
+   - Check terminal font support
+
 ### Error Messages
 
 - "System health checks failed": Check system status and logs
 - "Failed to update packages": Check internet connection and pacman status
 - "Failed to initialize logging": Ensure /var/log is writable
+- "Module validation failed": Check module type matches its number range
 
 ## Uninstallation
 
 ```bash
 ~/.local/share/update-arch/deploy.sh --uninstall
 ```
+
+## Version Information
+
+Current version: 0.2.0
+
+The version number follows semantic versioning:
+- MAJOR: Incompatible API changes
+- MINOR: Backwards-compatible features
+- PATCH: Backwards-compatible fixes
 
 ## License
 

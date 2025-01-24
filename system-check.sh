@@ -11,7 +11,7 @@ check_system_health() {
     
     # Set up error handling
     set_error_handlers
-    print_header "${INFO_ICON} PERFORMING SYSTEM HEALTH CHECKS"
+    print_header "${ICONS[info]} PERFORMING SYSTEM HEALTH CHECKS"
     
     # Network check
     check_network || return 1
