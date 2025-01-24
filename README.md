@@ -8,6 +8,11 @@ A modular system update script for Arch Linux that follows the Unix philosophy o
   - Split into focused, maintainable components
   - Extensible module system with priority-based execution
   - Easy enable/disable via file extensions
+
+## Demo
+
+![Update Tool Demo](demo.gif)
+
 - **Comprehensive System Checks**: Verifies system health before updates
 - **Smart Package Management**: 
   - Supports both official repos and AUR
