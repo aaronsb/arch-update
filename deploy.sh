@@ -316,6 +316,74 @@ create_symlink() {
     return 0
 }
 
+# Function to check if ~/.local/bin is in PATH and add it if not
+check_path() {
+    # Check if BIN_DIR is in PATH
+    if [[ ":$PATH:" != *":$BIN_DIR:"* ]]; then
+        print_warning "$BIN_DIR is not in your PATH"
+        echo "To add it to your PATH, add the following line to your shell profile:"
+        echo
+        echo "  export PATH=\"\$HOME/.local/bin:\$PATH\""
+        echo
+        
+        # Determine shell profile file
+        local shell_profile=""
+        case "$SHELL" in
+            */bash)
+                if [[ -f "$HOME/.bash_profile" ]]; then
+                    shell_profile="$HOME/.bash_profile"
+                elif [[ -f "$HOME/.profile" ]]; then
+                    shell_profile="$HOME/.profile"
+                else
+                    shell_profile="$HOME/.bashrc"
+                fi
+                ;;
+            */zsh)
+                shell_profile="$HOME/.zshrc"
+                ;;
+            */fish)
+                shell_profile="$HOME/.config/fish/config.fish"
+                ;;
+            *)
+                shell_profile="your shell profile"
+                ;;
+        esac
+        
+        echo "Would you like to add it to $shell_profile now? [y/N]"
+        local reply
+        read -r reply
+        
+        case "$reply" in
+            [Yy]*)
+                if [[ "$shell_profile" == "your shell profile" ]]; then
+                    print_warning "Could not determine your shell profile. Please add it manually."
+                    return 1
+                fi
+                
+                # Create directory if it doesn't exist
+                mkdir -p "$(dirname "$shell_profile")"
+                
+                # Add to shell profile
+                if [[ "$shell_profile" == *"fish"* ]]; then
+                    echo "set -x PATH \$HOME/.local/bin \$PATH" >> "$shell_profile"
+                else
+                    echo "export PATH=\"\$HOME/.local/bin:\$PATH\"" >> "$shell_profile"
+                fi
+                
+                print_success "Added $BIN_DIR to your PATH in $shell_profile"
+                print_warning "You need to restart your shell or run 'source $shell_profile' for the changes to take effect"
+                ;;
+            *)
+                print_warning "PATH not updated. You may need to run update-arch with its full path: $BIN_DIR/$SCRIPT_NAME"
+                ;;
+        esac
+        
+        return 1
+    fi
+    
+    return 0
+}
+
 # Function to remove all installed components
 uninstall() {
     print_warning "Uninstalling update-arch..."
@@ -389,10 +457,20 @@ install() {
     # Configure terminal preferences
     configure_terminal_preferences || return 1
     
+    # Check if ~/.local/bin is in PATH
+    check_path
+    local path_in_path=$?
+    
     local version
     version=$(get_version)
     print_success "Installation of update-arch v${version} complete!"
-    echo "You can now run '${GREEN}update-arch${NC}' from anywhere"
+    
+    if [[ $path_in_path -eq 0 ]]; then
+        echo "You can now run '${GREEN}update-arch${NC}' from anywhere"
+    else
+        echo "You can run '${GREEN}$BIN_DIR/$SCRIPT_NAME${NC}' to use the script"
+    fi
+    
     echo "Use '${GREEN}update-arch --help${NC}' to see available options"
     return 0
 }
