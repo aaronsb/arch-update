@@ -1,65 +1,35 @@
 #!/bin/bash
-#
-# REPLACE_MODULE_NAME (REPLACE_MODULE_NUMBER priority range)
 # REPLACE_MODULE_DESCRIPTION
-#
-# This module [REPLACE: Describe what this module does and why it's needed]
-# [REPLACE: Add any important notes about dependencies or requirements]
-#
-# Safety: [REPLACE: Describe any safety considerations or potential risks]
-# Dependencies: [REPLACE: List required commands or packages]
 
-# Module type declaration - DO NOT MODIFY
 MODULE_TYPE="system"
+MODULE_NAME="REPLACE_MODULE_NAME"
+MODULE_DESCRIPTION="REPLACE_MODULE_DESCRIPTION"
+# Space-separated commands that must exist on PATH. Leave empty if you
+# override check_supported() below.
+MODULE_REQUIRES=""
+# Set to "false" if run_update cannot be safely invoked under DRY_RUN.
+MODULE_DRY_RUN_SAFE="true"
 
-# Source utils if not already sourced
-if ! command -v print_header &>/dev/null; then
-    source "$(dirname "$(dirname "$(readlink -f "$0")")")/utils.sh"
-fi
+# Optional: override the default check_supported (which simply verifies that
+# every command in MODULE_REQUIRES is on PATH).
+# check_supported() {
+#     [[ -f "/some/required/file" ]]
+# }
 
-# Check if this module can run
-check_supported() {
-    # [REPLACE: Add commands to check if required tools/services exist]
-    # Example: checking if a specific command exists
-    # command -v some_command &>/dev/null
-    # return $?
-    
-    # Default to supported
-    return 0
-}
-
-# Run the update process
 run_update() {
-    print_header "${INFO_ICON} REPLACE_HEADER_TEXT"
-    
-    # [REPLACE: Add your module's main logic here]
-    # Example structure:
-    
-    # 1. Initial checks
-    print_status "${SYNC_ICON}" "Performing initial checks..."
-    
-    # 2. Main operations
-    print_status "${SYNC_ICON}" "Running main operations..."
-    
-    # 3. Verification
-    print_status "${SYNC_ICON}" "Verifying results..."
-    
-    # [REPLACE: Add appropriate error handling]
-    # Example error handling:
-    # if ! some_command; then
-    #     print_error "Failed to execute operation"
-    #     return 1
-    # fi
-    
-    return 0
-}
+    print_header "${ICONS[sync]} REPLACE_HEADER_TEXT"
 
-# If script is run directly, check support and run
-if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
-    if check_supported; then
-        run_update
-    else
-        echo "Module requirements not met"
-        exit 1
+    if [[ -n "$DRY_RUN" ]]; then
+        print_status "${ICONS[info]}" "Would: <describe what this module would do>"
+        return 0
     fi
-fi
+
+    # Replace with real work. Use sudo only for operations that need it.
+    # Example:
+    #   if ! sudo some-command; then
+    #       print_error "some-command failed"
+    #       return 1
+    #   fi
+
+    print_success "REPLACE_MODULE_NAME completed"
+}

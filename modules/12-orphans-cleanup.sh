@@ -1,95 +1,67 @@
 #!/bin/bash
-#
-# Orphaned Package Cleanup (10-19 priority range)
-# Removes packages that are no longer required by any other package
-# Provides educational information about package maintenance
+# Remove packages no longer required by anything else.
 
 MODULE_TYPE="system"
+MODULE_NAME="orphans-cleanup"
+MODULE_DESCRIPTION="Remove packages no longer required"
+MODULE_REQUIRES="pacman"
+MODULE_DRY_RUN_SAFE="true"
 
-# Source utils if not already sourced
-if ! command -v print_header &>/dev/null; then
-    source "$(dirname "$(dirname "$(readlink -f "$0")")")/utils.sh"
-fi
-
-# Check if this module can run
-check_supported() {
-    command -v pacman &>/dev/null
-    return $?
+# Sum "Installed Size" fields from pacman -Qi output, returning MB.
+orphan_total_mb() {
+    local pkgs="$1"
+    [[ -z "$pkgs" ]] && { echo 0; return; }
+    # shellcheck disable=SC2086
+    pacman -Qi $pkgs 2>/dev/null | awk '
+        /^Installed Size/ {
+            # Fields like "1.23 MiB", "456.00 KiB", "1.50 GiB"
+            n = $(NF-1); u = $NF
+            if (u == "KiB") bytes = n * 1024
+            else if (u == "MiB") bytes = n * 1024 * 1024
+            else if (u == "GiB") bytes = n * 1024 * 1024 * 1024
+            else if (u == "B")   bytes = n
+            else bytes = 0
+            total += bytes
+        }
+        END { printf "%d", total / 1024 / 1024 }
+    '
 }
 
-# Run the cleanup process
 run_update() {
     print_header "${ICONS[trash]} CLEANING ORPHANED PACKAGES"
-    
-    # Educational output about orphaned packages
+
     print_section_box \
         "About Orphaned Packages" \
         "Orphaned packages are those no longer required as dependencies\nRemoving them helps maintain a clean system" \
         "https://wiki.archlinux.org/title/Pacman/Tips_and_tricks#Removing_unused_packages"
-    
-    # Check for orphaned packages
+
     print_status "${ICONS[sync]}" "Checking for orphaned packages..."
-    local orphans=$(pacman -Qtdq)
-    
-    if [ $? -ne 0 ]; then
-        print_error "Failed to check for orphaned packages"
-        return 1
-    fi
-    
-    if [ -z "$orphans" ]; then
+    local orphans
+    orphans=$(pacman -Qtdq)
+
+    if [[ -z "$orphans" ]]; then
         print_success "No orphaned packages found"
         return 0
     fi
-    
-    # Get detailed information about orphaned packages
-    print_status "${ICONS[package]}" "Found orphaned packages:"
-    local orphan_details=$(pacman -Qti $(echo "$orphans"))
-    echo "$orphan_details"
-    
-    # Calculate total size of orphaned packages
-    local total_size=0
-    while IFS= read -r pkg; do
-        local size=$(pacman -Qi "$pkg" | grep "Installed Size" | cut -d: -f2 | tr -d ' ')
-        if [[ $size =~ ^[0-9]+\.[0-9]+.MiB$ ]]; then
-            size=$(echo "$size" | cut -d. -f1)
-            total_size=$((total_size + size))
-        elif [[ $size =~ ^[0-9]+\.[0-9]+.KiB$ ]]; then
-            size=$(echo "$size" | cut -d. -f1)
-            total_size=$((total_size + (size / 1024)))
-        fi
-    done <<< "$orphans"
-    
-    # In dry-run mode, just show what would be removed
+
+    print_status "${ICONS[package]}" "Orphaned packages:"
+    echo "$orphans"
+
+    local total_mb
+    total_mb=$(orphan_total_mb "$orphans")
+
     if [[ -n "$DRY_RUN" ]]; then
-        local orphan_count=$(echo "$orphans" | wc -l)
-        print_status "${ICONS[info]}" "Would remove $orphan_count orphaned package(s)"
-        print_status "${ICONS[info]}" "This would:"
-        print_status "${ICONS[info]}" "• Free approximately ${total_size}MB of disk space"
-        print_status "${ICONS[info]}" "• Remove packages no longer needed as dependencies"
-        print_status "${ICONS[info]}" "• Clean up package database entries"
+        local n
+        n=$(wc -l <<< "$orphans")
+        print_status "${ICONS[info]}" "Would remove $n orphan(s), freeing ~${total_mb}MB"
         return 0
     fi
-    
-    # Remove orphaned packages
+
     print_status "${ICONS[trash]}" "Removing orphaned packages..."
-    if ! sudo pacman -Rns $(echo "$orphans") --noconfirm; then
+    # shellcheck disable=SC2086
+    if ! sudo pacman -Rns $orphans --noconfirm; then
         print_error "Failed to remove orphaned packages"
-        print_info_box "Common issues:\n• Package required by another package\n• File conflicts\n• Insufficient permissions"
         return 1
     fi
-    
-    # Show cleanup results
-    print_success "Successfully removed orphaned packages"
-    print_info_box "• Freed approximately ${total_size}MB of disk space\n• System is now cleaner and more maintainable"
-    return 0
+    print_success "Removed orphans, freed ~${total_mb}MB"
 }
-
-# If script is run directly, check support and run
-if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
-    if check_supported; then
-        run_update
-    else
-        echo "Module requirements not met"
-        exit 1
-    fi
-fi

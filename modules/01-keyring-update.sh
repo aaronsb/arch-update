@@ -1,84 +1,59 @@
 #!/bin/bash
-#
-# Arch Linux keyring update module
-# Initializes and updates the pacman keyring
-# Provides educational information about package signing and security
+# Initialize and refresh the pacman keyring so package signatures validate.
 
 MODULE_TYPE="system"
-
-# Source utils if not already sourced
-if ! command -v print_header &>/dev/null; then
-    source "$(dirname "$(dirname "$(readlink -f "$0")")")/utils.sh"
-fi
-
-check_supported() {
-    # This module is supported on all Arch Linux systems, and returns an unconditional success.
-    return 0
-}
+MODULE_NAME="keyring-update"
+MODULE_DESCRIPTION="Initialize and refresh the pacman keyring"
+MODULE_REQUIRES="pacman-key"
+MODULE_DRY_RUN_SAFE="true"
 
 run_update() {
-    print_header "${KEY_ICON} UPDATING PACMAN KEYRING"
-    
-    # Educational output about package signing
+    print_header "${ICONS[key]} UPDATING PACMAN KEYRING"
+
     print_section_box \
         "About Package Signing" \
         "The pacman keyring ensures package authenticity\nPackage signing prevents malicious modifications" \
         "https://wiki.archlinux.org/title/Pacman/Package_signing"
-    
-    print_status "${KEY_ICON}" "Checking pacman keyring..."
-    
-    # Check keyring directory with explanation
-    if [ ! -d "/etc/pacman.d/gnupg" ]; then
-        print_info_box "Keyring directory not found at /etc/pacman.d/gnupg\nThis is normal for new installations"
-        print_warning "Initializing new pacman keyring..."
+
+    if [[ -n "$DRY_RUN" ]]; then
+        print_status "${ICONS[info]}" "Would initialize keyring if missing and refresh trustdb"
+        return 0
+    fi
+
+    print_status "${ICONS[key]}" "Checking pacman keyring..."
+
+    if [[ ! -d "/etc/pacman.d/gnupg" ]]; then
+        print_info_box "Keyring directory not found\nInitializing new keyring"
         if ! sudo pacman-key --init; then
             print_error "Failed to initialize pacman keyring"
-            print_info_box "Common issues:\n- Insufficient entropy for key generation\n- Disk space limitations\n- Permission problems in /etc/pacman.d"
             return 1
         fi
-        print_success "Keyring initialized successfully"
+        print_success "Keyring initialized"
     fi
-    
-    # Verify trustdb with explanation
-    print_status "${SYNC_ICON}" "Verifying trust database..."
+
+    print_status "${ICONS[sync]}" "Verifying trust database..."
+    if pacman-key --check-trustdb &>/dev/null; then
+        print_success "Pacman keyring verified"
+        return 0
+    fi
+
+    print_warning "Trust database needs updating"
+
+    print_status "${ICONS[sync]}" "Populating keyring with official Arch Linux keys..."
+    if ! sudo pacman-key --populate archlinux; then
+        print_error "Failed to populate keyring"
+        return 1
+    fi
+
+    print_status "${ICONS[sync]}" "Refreshing keys from keyservers..."
+    if ! sudo pacman-key --refresh-keys; then
+        print_warning "Failed to refresh keys (often transient)"
+    fi
+
     if ! pacman-key --check-trustdb &>/dev/null; then
-        print_warning "Trust database needs updating"
-        print_info_box "This ensures all trusted keys are properly recorded\nSometimes, this process is lengthy and may appear with some errors due to the nature of keyserver availability."
-        
-        # Update keyring with explanation
-        print_status "${SYNC_ICON}" "Populating keyring with official Arch Linux keys..."
-        print_info_box "This adds trusted developer keys to your system"
-        if ! sudo pacman-key --populate archlinux 2>&1 | sed \
-            -e "s/\(.*\[GNUPG:] PROGRESS.*\)/${BLUE}\1${NC}/" \
-            -e "s/\(.*\[GNUPG:] IMPORT_OK.*\)/${GREEN}\1${NC}/" \
-            -e "s/\(.*\[GNUPG:] IMPORT_RES.*\)/${CYAN}\1${NC}/" \
-            -e "s/\(.*gpg: key.*\)/${YELLOW}\1${NC}/" \
-            -e "s/\(.*gpg: Total number.*\)/${MAGENTA}\1${NC}/"; then
-            print_error "Failed to populate keyring"
-            return 1
-        fi
-        
-        # Refresh/update keys with explanation
-        print_status "${SYNC_ICON}" "Refreshing keys from keyservers..."
-        print_info_box "This updates existing keys with any revisions"
-        if ! sudo pacman-key --refresh-keys 2>&1 | sed \
-            -e "s/\(.*\[GNUPG:] PROGRESS.*\)/${BLUE}\1${NC}/" \
-            -e "s/\(.*gpg: requesting key.*\)/${GREEN}\1${NC}/" \
-            -e "s/\(.*gpg: key.*\)/${YELLOW}\1${NC}/" \
-            -e "s/\(.*gpg: Total number.*\)/${MAGENTA}\1${NC}/" \
-            -e "s/\(.*gpg: error.*\)/${RED}\1${NC}/"; then
-            print_warning "Failed to refresh keys from keyservers"
-            print_info_box "This is often temporary, will retry next update"
-        fi
-        
-        # Verify trustdb again
-        if ! pacman-key --check-trustdb &>/dev/null; then
-            print_error "Trust database still invalid after update"
-            print_info_box "Manual intervention may be required\nSee: https://wiki.archlinux.org/title/Pacman/Package_signing#Resetting_all_the_keys"
-            return 1
-        fi
+        print_error "Trust database still invalid after update"
+        return 1
     fi
-    
-    print_success "Pacman keyring verified and updated"
-    return 0
+
+    print_success "Pacman keyring updated"
 }

@@ -1,0 +1,8 @@
+# Files tracked in git but excluded from deploy.sh installation.
+# One glob or literal path per line. Blank lines and # comments ignored.
+# Matched against paths relative to the repo root.
+
+.deployignore
+.gitignore
+TODO.md
+test-terminal.sh

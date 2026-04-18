@@ -1,486 +1,403 @@
 #!/bin/bash
 #
-# Deployment script for update-arch system maintenance tool
-# Handles installation, uninstallation, and version management
+# Installer for update-arch. User-scope, XDG-compliant.
 
-# Source utils.sh first if available
+# shellcheck source=./utils.sh
 if [[ -f "./utils.sh" ]]; then
     source ./utils.sh
 else
-    # Minimal color definitions if utils.sh not available
-    RED="$(tput setaf 1)"
-    GREEN="$(tput setaf 2)"
-    YELLOW="$(tput setaf 3)"
-    NC="$(tput sgr0)"
-    print_error() { echo "${RED}ERROR: $1${NC}"; }
+    # Minimal fallback when invoked from somewhere without utils.sh alongside.
+    RED="$(tput setaf 1)"; GREEN="$(tput setaf 2)"; YELLOW="$(tput setaf 3)"
+    BLUE="$(tput setaf 4)"; NC="$(tput sgr0)"; BOLD="$(tput bold)"
+    print_error()   { echo "${RED}ERROR: $1${NC}" >&2; }
     print_success() { echo "${GREEN}SUCCESS: $1${NC}"; }
     print_warning() { echo "${YELLOW}WARNING: $1${NC}"; }
+    print_header()  { echo -e "\n${BLUE}${BOLD}=== $1 ===${NC}\n"; }
+    print_info_box(){ echo "${BLUE}> $1${NC}"; }
+    UPDATE_ARCH_DATA_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/update-arch"
+    UPDATE_ARCH_CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/update-arch"
+    UPDATE_ARCH_STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/update-arch"
+    UPDATE_ARCH_CACHE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/update-arch"
+    UPDATE_ARCH_BIN_DIR="$HOME/.local/bin"
+    UPDATE_ARCH_TERMINAL_CONF="$UPDATE_ARCH_CONFIG_DIR/terminal.conf"
 fi
 
-# Constants
-INSTALL_DIR="$HOME/.local/share/update-arch"
-BIN_DIR="$HOME/.local/bin"
 SCRIPT_NAME="update-arch"
 REQUIRED_DEPS="bash sudo pacman systemctl"
 
-# Function to extract version from update.sh
 get_version() {
-    local version_line
-    version_line=$(grep "^VERSION=" "update.sh")
-    echo "${version_line#VERSION=}" | tr -d '"'
+    local line
+    line=$(grep "^VERSION=" "update.sh")
+    echo "${line#VERSION=}" | tr -d '"'
 }
 
-# Function to verify required dependencies
 check_dependencies() {
-    local missing_deps=()
+    local missing=()
     for dep in $REQUIRED_DEPS; do
-        if ! command -v "$dep" &>/dev/null; then
-            missing_deps+=("$dep")
-        fi
+        command -v "$dep" &>/dev/null || missing+=("$dep")
     done
-    
-    if [[ ${#missing_deps[@]} -ne 0 ]]; then
-        print_error "Missing required dependencies: ${missing_deps[*]}"
+    if (( ${#missing[@]} > 0 )); then
+        print_error "Missing required dependencies: ${missing[*]}"
         return 1
     fi
-    return 0
 }
 
-# Function to get list of tracked files from git
+DEPLOYIGNORE_FILE=".deployignore"
+
+# Read .deployignore into an array of patterns. Blank lines and # comments skipped.
+load_deployignore() {
+    DEPLOYIGNORE_PATTERNS=()
+    [[ -f "$DEPLOYIGNORE_FILE" ]] || return 0
+    local line
+    while IFS= read -r line; do
+        line="${line%%#*}"
+        line="${line#"${line%%[![:space:]]*}"}"
+        line="${line%"${line##*[![:space:]]}"}"
+        [[ -n "$line" ]] && DEPLOYIGNORE_PATTERNS+=("$line")
+    done < "$DEPLOYIGNORE_FILE"
+}
+
+is_deployignored() {
+    local path="$1" pattern
+    for pattern in "${DEPLOYIGNORE_PATTERNS[@]}"; do
+        # shellcheck disable=SC2053
+        [[ "$path" == $pattern ]] && return 0
+    done
+    return 1
+}
+
 get_tracked_files() {
     if ! git rev-parse --is-inside-work-tree &>/dev/null; then
         print_error "Not in a git repository"
         return 1
     fi
-    
-    # Get list of tracked files, excluding .git* files
-    git ls-files | grep -v "^\.git"
-    return $?
+    load_deployignore
+    local f
+    while IFS= read -r f; do
+        [[ "$f" == .git* ]] && continue
+        is_deployignored "$f" && continue
+        echo "$f"
+    done < <(git ls-files)
 }
 
-# Function to compute hash of a file
-compute_file_hash() {
-    local file="$1"
-    if [[ -f "$file" ]]; then
-        git hash-object "$file"
-    else
-        echo "file_not_found"
-    fi
+file_hash() {
+    [[ -f "$1" ]] && git hash-object "$1" || echo "missing"
 }
 
-# Function to detect modified files in deployment
-compute_file_changes() {
-    local source_file deployed_file source_hash deployed_hash
-    local modified_files=()
-    
-    while IFS= read -r file; do
-        source_file="$file"
-        deployed_file="$INSTALL_DIR/$file"
-        
-        # Skip if deployed file doesn't exist
-        [[ ! -f "$deployed_file" ]] && continue
-        
-        source_hash=$(compute_file_hash "$source_file")
-        deployed_hash=$(compute_file_hash "$deployed_file")
-        
-        if [[ "$source_hash" != "$deployed_hash" ]]; then
-            modified_files+=("$file")
+list_modified_files() {
+    local f deployed
+    while IFS= read -r f; do
+        deployed="$UPDATE_ARCH_DATA_DIR/$f"
+        [[ -f "$deployed" ]] || continue
+        if [[ "$(file_hash "$f")" != "$(file_hash "$deployed")" ]]; then
+            echo "$f"
         fi
     done < <(get_tracked_files)
-    
-    (IFS=$'\n'; echo "${modified_files[*]}")
 }
 
-# Function to detect extra files in deployment
-detect_extra_files() {
-    local tracked_files extra_files=()
-    local deploy_base="${INSTALL_DIR#"$HOME/"}"  # Remove $HOME/ prefix for cleaner output
-    
-    # Get tracked files
-    tracked_files=$(get_tracked_files)
-    
-    # Find all files in deployment directory
-    while IFS= read -r deployed_file; do
-        # Convert to relative path
-        local rel_path="${deployed_file#"$INSTALL_DIR/"}"
-        
-        # Check if file is tracked
-        if ! echo "$tracked_files" | grep -Fq "$rel_path"; then
-            extra_files+=("$deploy_base/$rel_path")
-        fi
-    done < <(find "$INSTALL_DIR" -type f 2>/dev/null)
-    
-    (IFS=$'\n'; echo "${extra_files[*]}")
+list_extra_files() {
+    local tracked
+    tracked=$(get_tracked_files)
+    [[ -d "$UPDATE_ARCH_DATA_DIR" ]] || return 0
+
+    local deployed rel
+    while IFS= read -r deployed; do
+        rel="${deployed#"$UPDATE_ARCH_DATA_DIR/"}"
+        # grep -Fxq: exact whole-line match, so "utils.sh" doesn't match "utils.sh.bak"
+        grep -Fxq "$rel" <<< "$tracked" || echo "$rel"
+    done < <(find "$UPDATE_ARCH_DATA_DIR" -type f 2>/dev/null)
 }
 
-# Function to handle extra files
 handle_extra_files() {
-    local extra_files="$1"
-    local reply
-    
+    local extras="$1" reply
     echo
-    print_warning "The following files were found in the deployment directory but are not in the git repository:"
-    echo "$extra_files" | sed 's/^/  /'
+    print_warning "Files present in $UPDATE_ARCH_DATA_DIR but not tracked in git:"
+    sed 's/^/  /' <<< "$extras"
     echo
-    print_warning "These files may cause unexpected behavior. It's recommended to:"
-    echo "1. Move important files to your git repository"
-    echo "2. Remove extra files from the deployment directory"
-    echo
-    echo "Would you like to remove these extra files? [y/N]"
+    echo "Remove these extra files? [y/N]"
     read -r reply
-    
     case "$reply" in
         [Yy]*)
-            echo "$extra_files" | while IFS= read -r file; do
-                rm -f "$HOME/$file"
-                echo "Removed: $file"
-            done
-            return 0
+            while IFS= read -r rel; do
+                [[ -z "$rel" ]] && continue
+                rm -f "$UPDATE_ARCH_DATA_DIR/$rel" && echo "Removed: $rel"
+            done <<< "$extras"
             ;;
-        *)
-            print_warning "Keeping extra files - they may cause unexpected behavior"
-            return 1
-            ;;
+        *) print_warning "Keeping extra files — they may cause unexpected behavior" ;;
     esac
 }
 
-# Function to check existing deployment
 check_existing_deployment() {
-    if [[ ! -d "$INSTALL_DIR" ]]; then
-        return 1
-    fi
-    
-    local modified_files
-    modified_files=$(compute_file_changes)
-    
-    if [[ -n "$modified_files" ]]; then
+    [[ -d "$UPDATE_ARCH_DATA_DIR" ]] || return 1
+
+    local modified
+    modified=$(list_modified_files)
+
+    if [[ -n "$modified" ]]; then
         print_warning "The following deployed files have been modified:"
-        echo "$modified_files" | sed 's/^/  /'
+        sed 's/^/  /' <<< "$modified"
         echo
         print_warning "Proceeding will overwrite these modifications"
-        echo "Consider moving any important changes to your git repository"
-        echo
         echo "Press Enter to continue or Ctrl+C to abort"
         read -r
     fi
-    
     return 0
 }
 
-# Function to set up installation directories
 create_directories() {
-    mkdir -p "$INSTALL_DIR" "$BIN_DIR" "$INSTALL_DIR/modules" "$HOME/.config/update-arch"
-    if [[ $? -ne 0 ]]; then
-        print_error "Failed to create required directories"
-        return 1
-    fi
-    return 0
+    mkdir -p \
+        "$UPDATE_ARCH_DATA_DIR/modules" \
+        "$UPDATE_ARCH_CONFIG_DIR" \
+        "$UPDATE_ARCH_STATE_DIR/logs" \
+        "$UPDATE_ARCH_CACHE_DIR" \
+        "$UPDATE_ARCH_BIN_DIR" \
+        || { print_error "Failed to create required directories"; return 1; }
 }
 
-# Function to configure terminal preferences
 configure_terminal_preferences() {
-    local config_file="$HOME/.config/update-arch/terminal.conf"
-    local detected_term reply
-    
-    # Run terminal detection
-    detected_term=$(detect_terminal)
-    
-    # Create or update config file
-    cat > "$config_file" << EOL
+    local detected reply preferred
+    detected=$(detect_terminal)
+
+    cat > "$UPDATE_ARCH_TERMINAL_CONF" << EOL
 # Terminal configuration for update-arch
 # Last updated: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
-DETECTED_TERMINAL="$detected_term"
+DETECTED_TERMINAL="$detected"
 PREFERRED_TERMINAL="auto"
 FORCE_ASCII_ICONS="false"
 LAST_DETECTION_TIME="$(date +%s)"
 EOL
-    
-    print_success "Terminal detected: $detected_term"
+
+    print_success "Terminal detected: $detected"
     echo
-    print_warning "Would you like to customize terminal preferences? [y/N]"
+    echo "Customize terminal preferences? [y/N]"
     read -r reply
-    
     case "$reply" in
         [Yy]*)
-            echo
-            print_warning "Force ASCII icons (no Nerd Font icons)? [y/N]"
+            echo "Force ASCII icons (no Nerd Font)? [y/N]"
             read -r reply
-            case "$reply" in
-                [Yy]*)
-                    sed -i 's/FORCE_ASCII_ICONS="false"/FORCE_ASCII_ICONS="true"/' "$config_file"
-                    print_success "ASCII icons enabled"
-                    ;;
-            esac
-            
-            echo
-            print_warning "Override detected terminal? [y/N]"
+            [[ "$reply" =~ ^[Yy] ]] && sed -i 's/FORCE_ASCII_ICONS="false"/FORCE_ASCII_ICONS="true"/' "$UPDATE_ARCH_TERMINAL_CONF"
+
+            echo "Override detected terminal? [y/N]"
             read -r reply
-            case "$reply" in
-                [Yy]*)
-                    echo "Enter preferred terminal (e.g., vscode, kitty, auto):"
-                    read -r preferred
-                    sed -i "s/PREFERRED_TERMINAL=\"auto\"/PREFERRED_TERMINAL=\"$preferred\"/" "$config_file"
-                    print_success "Preferred terminal set to: $preferred"
-                    ;;
-            esac
+            if [[ "$reply" =~ ^[Yy] ]]; then
+                echo "Preferred terminal (vscode, kitty, auto, ...):"
+                read -r preferred
+                sed -i "s/PREFERRED_TERMINAL=\"auto\"/PREFERRED_TERMINAL=\"$preferred\"/" "$UPDATE_ARCH_TERMINAL_CONF"
+            fi
             ;;
     esac
-    
-    echo
+
     print_success "Terminal preferences configured"
-    print_info_box "You can reconfigure anytime with: update-arch --configure-terminal"
-    return 0
+    print_info_box "Reconfigure anytime: update-arch --configure-terminal"
 }
 
-# Function to install script files
 copy_files() {
-    local file target_dir target_file
-    local copied_files=0
-    local tracked_files
-    
-    # Get list of tracked files from git
-    tracked_files=$(get_tracked_files) || {
-        print_error "Failed to get list of tracked files"
-        return 1
-    }
-    
-    # Process each tracked file
-    while IFS= read -r file; do
-        # Skip empty lines
-        [[ -z "$file" ]] && continue
-        
-        # Skip files that don't exist (might be renamed with .disabled)
-        [[ ! -f "$file" ]] && continue
-        
-        # Determine target directory and filename
-        if [[ "$file" == modules/* ]]; then
-            target_dir="$INSTALL_DIR/modules"
-            # If source is .disabled, keep that extension in target
-            if [[ "$file" == *.disabled ]]; then
-                target_file="$INSTALL_DIR/$file"
-            else
-                target_file="$INSTALL_DIR/${file%.*}.sh"
-            fi
+    local tracked
+    tracked=$(get_tracked_files) || return 1
+
+    local f target_dir target copied=0
+    while IFS= read -r f; do
+        [[ -z "$f" ]] && continue
+        [[ ! -f "$f" ]] && continue
+
+        if [[ "$f" == modules/* ]]; then
+            target_dir="$UPDATE_ARCH_DATA_DIR/modules"
+            target="$UPDATE_ARCH_DATA_DIR/$f"
         else
-            target_dir="$INSTALL_DIR"
-            target_file="$INSTALL_DIR/$file"
+            target_dir="$UPDATE_ARCH_DATA_DIR"
+            target="$UPDATE_ARCH_DATA_DIR/$f"
         fi
-        
-        # Create target directory if needed
-        mkdir -p "$(dirname "$target_file")"
-        
-        # Copy file
-        if cp "$file" "$target_file"; then
-            echo "Copied: $file"
-            ((copied_files++))
-            
-            # Make shell scripts executable
-            if [[ "$file" == *.sh ]] && [[ "$file" != *.sh.disabled ]]; then
-                chmod +x "$target_file" || {
-                    print_error "Failed to set executable permissions on $file"
-                    return 1
-                }
+
+        mkdir -p "$(dirname "$target")"
+
+        if cp "$f" "$target"; then
+            ((copied++))
+            if [[ "$f" == *.sh && "$f" != *.sh.disabled ]]; then
+                chmod +x "$target" || { print_error "chmod +x failed on $f"; return 1; }
             fi
         else
-            print_error "Failed to copy $file"
+            print_error "Failed to copy $f"
             return 1
         fi
-    done <<< "$tracked_files"
-    
-    if [[ $copied_files -eq 0 ]]; then
-        print_error "No files were copied"
-        return 1
-    fi
-    
-    print_success "Copied $copied_files files"
-    return 0
+    done <<< "$tracked"
+
+    (( copied == 0 )) && { print_error "No files copied"; return 1; }
+    print_success "Copied $copied files"
 }
 
-# Function to create command symlink
 create_symlink() {
-    # Remove existing symlink if it exists
-    if [[ -L "$BIN_DIR/$SCRIPT_NAME" ]]; then
-        rm "$BIN_DIR/$SCRIPT_NAME"
-    elif [[ -e "$BIN_DIR/$SCRIPT_NAME" ]]; then
-        print_error "$BIN_DIR/$SCRIPT_NAME exists but is not a symlink"
+    local link="$UPDATE_ARCH_BIN_DIR/$SCRIPT_NAME"
+
+    if [[ -L "$link" ]]; then
+        rm "$link"
+    elif [[ -e "$link" ]]; then
+        print_error "$link exists but is not a symlink"
         return 1
     fi
-    
-    # Create new symlink
-    ln -s "$INSTALL_DIR/update.sh" "$BIN_DIR/$SCRIPT_NAME"
-    if [[ $? -ne 0 ]]; then
-        print_error "Failed to create symlink"
-        return 1
-    fi
-    
-    return 0
+
+    ln -s "$UPDATE_ARCH_DATA_DIR/update.sh" "$link" \
+        || { print_error "Failed to create symlink"; return 1; }
 }
 
-# Function to check if ~/.local/bin is in PATH and add it if not
-check_path() {
-    # Check if BIN_DIR is in PATH
-    if [[ ":$PATH:" != *":$BIN_DIR:"* ]]; then
-        print_warning "$BIN_DIR is not in your PATH"
-        echo "To add it to your PATH, add the following line to your shell profile:"
+ensure_path() {
+    [[ ":$PATH:" == *":$UPDATE_ARCH_BIN_DIR:"* ]] && return 0
+
+    print_warning "$UPDATE_ARCH_BIN_DIR is not in your PATH"
+    echo "Add to your shell profile:"
+    echo "  export PATH=\"\$HOME/.local/bin:\$PATH\""
+    echo
+
+    local profile=""
+    case "$SHELL" in
+        */bash) [[ -f "$HOME/.bash_profile" ]] && profile="$HOME/.bash_profile" || profile="$HOME/.bashrc" ;;
+        */zsh)  profile="$HOME/.zshrc" ;;
+        */fish) profile="$HOME/.config/fish/config.fish" ;;
+        *)      profile="" ;;
+    esac
+
+    echo "Add to ${profile:-your shell profile} now? [y/N]"
+    local reply
+    read -r reply
+    if [[ "$reply" =~ ^[Yy] ]]; then
+        [[ -z "$profile" ]] && { print_warning "Unknown shell profile; add manually"; return 1; }
+        mkdir -p "$(dirname "$profile")"
+        if [[ "$profile" == *fish* ]]; then
+            echo "set -x PATH \$HOME/.local/bin \$PATH" >> "$profile"
+        else
+            echo "export PATH=\"\$HOME/.local/bin:\$PATH\"" >> "$profile"
+        fi
+        print_success "Added $UPDATE_ARCH_BIN_DIR to PATH in $profile"
+        print_warning "Run 'source $profile' or restart your shell"
+    fi
+    return 1
+}
+
+uninstall() {
+    local assume_yes="$1"
+    if [[ "$assume_yes" != "yes" ]]; then
+        print_warning "This will remove:"
+        echo "  • Symlink:  $UPDATE_ARCH_BIN_DIR/$SCRIPT_NAME"
+        echo "  • Data:     $UPDATE_ARCH_DATA_DIR"
+        echo "  • Config:   $UPDATE_ARCH_TERMINAL_CONF"
+        echo "  (logs and cache preserved)"
         echo
-        echo "  export PATH=\"\$HOME/.local/bin:\$PATH\""
-        echo
-        
-        # Determine shell profile file
-        local shell_profile=""
-        case "$SHELL" in
-            */bash)
-                if [[ -f "$HOME/.bash_profile" ]]; then
-                    shell_profile="$HOME/.bash_profile"
-                elif [[ -f "$HOME/.profile" ]]; then
-                    shell_profile="$HOME/.profile"
-                else
-                    shell_profile="$HOME/.bashrc"
-                fi
-                ;;
-            */zsh)
-                shell_profile="$HOME/.zshrc"
-                ;;
-            */fish)
-                shell_profile="$HOME/.config/fish/config.fish"
-                ;;
-            *)
-                shell_profile="your shell profile"
-                ;;
-        esac
-        
-        echo "Would you like to add it to $shell_profile now? [y/N]"
+        echo "Proceed? [y/N]"
         local reply
         read -r reply
-        
-        case "$reply" in
-            [Yy]*)
-                if [[ "$shell_profile" == "your shell profile" ]]; then
-                    print_warning "Could not determine your shell profile. Please add it manually."
-                    return 1
-                fi
-                
-                # Create directory if it doesn't exist
-                mkdir -p "$(dirname "$shell_profile")"
-                
-                # Add to shell profile
-                if [[ "$shell_profile" == *"fish"* ]]; then
-                    echo "set -x PATH \$HOME/.local/bin \$PATH" >> "$shell_profile"
-                else
-                    echo "export PATH=\"\$HOME/.local/bin:\$PATH\"" >> "$shell_profile"
-                fi
-                
-                print_success "Added $BIN_DIR to your PATH in $shell_profile"
-                print_warning "You need to restart your shell or run 'source $shell_profile' for the changes to take effect"
-                ;;
-            *)
-                print_warning "PATH not updated. You may need to run update-arch with its full path: $BIN_DIR/$SCRIPT_NAME"
-                ;;
-        esac
-        
-        return 1
+        [[ "$reply" =~ ^[Yy] ]] || { echo "Aborted"; return 1; }
     fi
-    
-    return 0
-}
 
-# Function to remove all installed components
-uninstall() {
     print_warning "Uninstalling update-arch..."
-    
-    # Remove symlink
-    if [[ -L "$BIN_DIR/$SCRIPT_NAME" ]]; then
-        rm "$BIN_DIR/$SCRIPT_NAME"
-        print_success "Removed symlink"
+    local link="$UPDATE_ARCH_BIN_DIR/$SCRIPT_NAME"
+
+    [[ -L "$link" ]] && { rm "$link"; print_success "Removed symlink"; }
+
+    if [[ -d "$UPDATE_ARCH_DATA_DIR" ]]; then
+        rm -rf "$UPDATE_ARCH_DATA_DIR"
+        print_success "Removed $UPDATE_ARCH_DATA_DIR"
     fi
-    
-    # Remove install directory
-    if [[ -d "$INSTALL_DIR" ]]; then
-        rm -rf "$INSTALL_DIR"
-        print_success "Removed install directory"
-    fi
-    
-    # Remove terminal configuration
-    if [[ -f "$HOME/.config/update-arch/terminal.conf" ]]; then
-        rm -f "$HOME/.config/update-arch/terminal.conf"
+
+    if [[ -f "$UPDATE_ARCH_TERMINAL_CONF" ]]; then
+        rm -f "$UPDATE_ARCH_TERMINAL_CONF"
+        rmdir "$UPDATE_ARCH_CONFIG_DIR" 2>/dev/null || true
         print_success "Removed terminal configuration"
-        # Try to remove config directory if empty
-        rmdir "$HOME/.config/update-arch" 2>/dev/null || true
     fi
-    
+
+    echo
+    echo "Preserved (contain user data — remove manually if desired):"
+    echo "  $UPDATE_ARCH_STATE_DIR  (run logs)"
+    echo "  $UPDATE_ARCH_CACHE_DIR  (cached backups)"
     print_success "Uninstallation complete"
-    return 0
 }
 
-# Function to perform installation
 install() {
-    print_header "Installing update-arch..."
-    
-    # Check dependencies
+    print_header "Installing update-arch (user scope)"
+
     check_dependencies || return 1
-    
-    # Check if we're in a git repository
+
     if ! git rev-parse --is-inside-work-tree &>/dev/null; then
         print_error "Not running from a git repository"
         print_error "The deploy script requires a git repository to track file changes"
         return 1
     fi
-    
-    # Run terminal detection test first
+
     print_header "Terminal Detection"
     test_terminal_detection
-    
-    # Check for existing deployment and modifications
+
     if check_existing_deployment; then
-        print_warning "Existing deployment detected"
-        echo "This is normal - files will be updated in place"
+        print_warning "Existing deployment detected — updating in place"
         echo
-        
-        # Check for extra files
-        local extra_files
-        extra_files=$(detect_extra_files)
-        
-        if [[ -n "$extra_files" ]]; then
-            handle_extra_files "$extra_files"
-        fi
+
+        local extras
+        extras=$(list_extra_files)
+        [[ -n "$extras" ]] && handle_extra_files "$extras"
     fi
-    
-    # Create directories
+
     create_directories || return 1
-    
-    # Copy files
-    copy_files || return 1
-    
-    # Create symlink
-    create_symlink || return 1
-    
-    # Configure terminal preferences
-    configure_terminal_preferences || return 1
-    
-    # Check if ~/.local/bin is in PATH
-    check_path
-    local path_in_path=$?
-    
+    copy_files         || return 1
+    create_symlink     || return 1
+    configure_terminal_preferences
+
+    local path_ok=0
+    ensure_path || path_ok=1
+
     local version
     version=$(get_version)
-    print_success "Installation of update-arch v${version} complete!"
-    
-    if [[ $path_in_path -eq 0 ]]; then
-        echo "You can now run '${GREEN}update-arch${NC}' from anywhere"
+    print_success "Installed update-arch v${version}"
+
+    if (( path_ok == 0 )); then
+        echo "Run: ${GREEN}update-arch${NC}"
     else
-        echo "You can run '${GREEN}$BIN_DIR/$SCRIPT_NAME${NC}' to use the script"
+        echo "Run: ${GREEN}$UPDATE_ARCH_BIN_DIR/$SCRIPT_NAME${NC}"
     fi
-    
-    echo "Use '${GREEN}update-arch --help${NC}' to see available options"
-    return 0
+
+    echo
+    echo "XDG paths:"
+    echo "  Data:   $UPDATE_ARCH_DATA_DIR"
+    echo "  Config: $UPDATE_ARCH_CONFIG_DIR"
+    echo "  State:  $UPDATE_ARCH_STATE_DIR"
+    echo "  Cache:  $UPDATE_ARCH_CACHE_DIR"
 }
 
-# Main execution logic
-case "$1" in
-    --uninstall)
-        uninstall
-        ;;
-    *)
-        install
-        ;;
+show_help() {
+    cat << EOF
+${CYAN}${BOLD}deploy.sh${NC}: Install / uninstall update-arch (user scope, XDG-compliant)
+
+${BOLD}Usage:${NC} ./deploy.sh <command>
+
+${BOLD}Commands:${NC}
+  ${GREEN}--install${NC}       Install or update the deployed copy
+  ${GREEN}--uninstall${NC}     Remove the deployed copy (prompts for confirmation)
+  ${GREEN}--yes${NC}           With --uninstall, skip the confirmation prompt
+  ${GREEN}-h, --help${NC}      Show this help
+
+${BOLD}Paths (XDG):${NC}
+  Data:   $UPDATE_ARCH_DATA_DIR
+  Config: $UPDATE_ARCH_CONFIG_DIR
+  State:  $UPDATE_ARCH_STATE_DIR  (preserved on uninstall)
+  Cache:  $UPDATE_ARCH_CACHE_DIR  (preserved on uninstall)
+EOF
+}
+
+if [[ $# -eq 0 ]]; then
+    show_help
+    exit 0
+fi
+
+ASSUME_YES="no"
+COMMAND=""
+while (( $# > 0 )); do
+    case "$1" in
+        -h|--help)   show_help; exit 0 ;;
+        --install)   COMMAND="install"; shift ;;
+        --uninstall) COMMAND="uninstall"; shift ;;
+        --yes|-y)    ASSUME_YES="yes"; shift ;;
+        *)           print_error "Unknown option: $1"; show_help; exit 1 ;;
+    esac
+done
+
+case "$COMMAND" in
+    install)   install ;;
+    uninstall) uninstall "$ASSUME_YES" ;;
+    *)         show_help; exit 1 ;;
 esac

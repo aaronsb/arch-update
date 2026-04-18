@@ -1,28 +1,44 @@
 #!/bin/bash
+#
+# Pre-flight checks run before any module executes.
 
-# Function to check system health
 check_system_health() {
-    local SCRIPT_DIR="$1"
-    
-    # Source utils.sh if not already sourced
+    local script_dir="$1"
+
     if ! command -v print_header &>/dev/null; then
-        source "$SCRIPT_DIR/utils.sh"
+        # shellcheck disable=SC1091
+        source "$script_dir/utils.sh"
     fi
-    
-    # Set up error handling
+
     set_error_handlers
     print_header "${ICONS[info]} PERFORMING SYSTEM HEALTH CHECKS"
-    
-    # Network check
-    check_network || return 1
-    
-    # Disk space check
+
+    check_network    || return 1
     check_disk_space || return 1
-    
     return 0
 }
 
-# Run checks if script is executed directly
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
-    check_system_health
+    case "${1:-}" in
+        --check)
+            check_system_health "$(dirname "$(readlink -f "$0")")"
+            ;;
+        -h|--help|"")
+            cat << 'EOF'
+system-check.sh: pre-flight health checks for update-arch.
+
+Usage: ./system-check.sh <command>
+
+Commands:
+  --check        Run the health checks (network + disk space)
+  -h, --help     Show this help
+
+This script is normally sourced by update-arch and not invoked directly.
+EOF
+            ;;
+        *)
+            echo "Unknown option: $1" >&2
+            exit 1
+            ;;
+    esac
 fi

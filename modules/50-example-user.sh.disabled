@@ -1,74 +1,32 @@
 #!/bin/bash
-#
-# Example User Module (50-79 priority range)
-# Demonstrates user-specific maintenance tasks with educational output
-#
-# This module serves as a template and learning resource for user-level modules.
-# It demonstrates proper handling of user configurations, AUR package management,
-# and other user-specific maintenance tasks common in the update system.
-#
-# Safety: Read-only operations for demonstration
-# Educational: Includes links to official documentation
+# Example user module — copy and customize to create your own.
+# Rename to NN-myname.sh (any free number in 50-89) to enable.
+# User modules should never call sudo.
 
-# Module type declaration
 MODULE_TYPE="user"
+MODULE_NAME="example-user"
+MODULE_DESCRIPTION="Read-only demo of the user-module shape"
+MODULE_REQUIRES=""
+MODULE_DRY_RUN_SAFE="true"
 
-# Source utils if not already sourced
-if ! command -v print_header &>/dev/null; then
-    source "$(dirname "$(dirname "$(readlink -f "$0")")")/utils.sh"
-fi
-
-# Check if this module can run
-check_supported() {
-    # Example: check if a user tool exists
-    command -v yay &>/dev/null
-    return $?
-}
-
-# Run the update process
 run_update() {
-    print_header "${INFO_ICON} USER MAINTENANCE EXAMPLE"
-    
-    # User Module Structure Example
-    print_section_box \
-        "User Module Structure Example" \
-        "1. Header with description and safety info\n2. MODULE_TYPE declaration as 'user'\n3. User permission checks\n4. Configuration handling" \
-        "https://wiki.archlinux.org/title/User:Example"
-    
-    # AUR Package Management Example
-    print_status "${INFO_ICON}" "=== AUR Package Management Example ==="
-    print_status "${SYNC_ICON}" "Checking AUR packages..."
-    if ! aur_count=$(pacman -Qm | wc -l); then
-        print_error "Failed to check AUR packages"
-        print_info_box "Common issues:\n- Database access\n- Package manager lock"
-        return 1
-    fi
-    print_section_box \
-        "AUR Package Management" \
-        "Found ${aur_count} AUR packages\nAUR helpers automate building and installing community packages" \
-        "https://wiki.archlinux.org/title/AUR_helpers"
-    
-    # User Configuration Example
-    print_section_box \
-        "User Configuration Example" \
-        "Configuration locations:\n1. ~/.config - XDG config home\n2. ~/.local/share - XDG data home\n3. ~/.cache - XDG cache home" \
-        "https://wiki.archlinux.org/title/XDG_Base_Directory"
-    
-    # Safety Features Example
-    print_section_box \
-        "User Safety Features Example" \
-        "1. Config file backups\n2. Permission verification\n3. Safe update practices\n4. Recovery options" \
-        "https://wiki.archlinux.org/title/System_maintenance#User_specific"
-    
-    return 0
-}
+    print_header "${ICONS[user]} USER MODULE EXAMPLE"
 
-# If script is run directly, check support and run
-if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
-    if check_supported; then
-        run_update
-    else
-        echo "Module requirements not met"
-        exit 1
+    print_section_box \
+        "XDG User Directories" \
+        "Config: \$XDG_CONFIG_HOME (default ~/.config)\nData:   \$XDG_DATA_HOME (default ~/.local/share)\nCache:  \$XDG_CACHE_HOME (default ~/.cache)\nState:  \$XDG_STATE_HOME (default ~/.local/state)" \
+        "https://wiki.archlinux.org/title/XDG_Base_Directory"
+
+    if command -v pacman &>/dev/null; then
+        local aur_count
+        aur_count=$(pacman -Qm 2>/dev/null | wc -l)
+        print_info_box "Foreign (AUR/local) packages: $aur_count"
     fi
-fi
+
+    if [[ -n "$DRY_RUN" ]]; then
+        print_status "${ICONS[info]}" "Would: real modules do work here"
+        return 0
+    fi
+
+    print_success "Example completed"
+}

@@ -1,203 +1,138 @@
 #!/bin/bash
+#
+# Create a new update-arch module from the appropriate template.
 
-# Source utils for common functions
-source "$(dirname "$(readlink -f "$0")")/utils.sh"
-
-# Constants
 SCRIPT_DIR="$(dirname "$(readlink -f "$0")")"
+source "$SCRIPT_DIR/utils.sh"
+
 TEMPLATES_DIR="${SCRIPT_DIR}/templates"
 MODULES_DIR="${SCRIPT_DIR}/modules"
 
-# Help text
 show_help() {
     cat << EOF
 ${CYAN}${BOLD}create-module${NC}: Create a new update-arch module from template
 
-${BOLD}Usage:${NC} create-module [OPTIONS]
+${BOLD}Usage:${NC} create-module -t <type>
 
-${BOLD}Options:${NC}
-    ${GREEN}-h, --help${NC}        Show this help message
-    ${GREEN}-t, --type${NC}        Module type (system|user|status)
+${BOLD}Types:${NC}
+  ${GREEN}system${NC}  (10-49) — system-level maintenance (may use sudo)
+  ${GREEN}user${NC}    (50-89) — user-specific maintenance (no sudo)
+  ${GREEN}status${NC}  (90-99) — post-update status display (read-only)
 
-${BOLD}Description:${NC}
-Creates a new module from the appropriate template based on type:
-${CYAN}•${NC} system  (10-49 range) - System-level maintenance tasks
-${CYAN}•${NC} user    (50-89 range) - User-specific maintenance tasks
-${CYAN}•${NC} status  (90+ range)   - System status display tasks
-
-The script will interactively prompt for:
-${CYAN}•${NC} Module name
-${CYAN}•${NC} Module description
-${CYAN}•${NC} Additional configuration options
+The script interactively prompts for name and description, then creates
+both the module script and its .md doc from the matching template.
 EOF
 }
 
-# Function to get the next available number for a module type
 get_next_module_number() {
-    local type="$1"
-    local pattern
-    local start
-    local end
-    
+    local type="$1" start end
     case "$type" in
-        system)
-            pattern="[1-4][0-9]"
-            start=10
-            end=49
-            ;;
-        user)
-            pattern="[5-8][0-9]"
-            start=50
-            end=89
-            ;;
-        status)
-            pattern="9[0-9]"
-            start=90
-            end=99
-            ;;
-        *)
-            print_error "Invalid module type: $type"
-            exit 1
-            ;;
+        system) start=10; end=49 ;;
+        user)   start=50; end=89 ;;
+        status) start=90; end=99 ;;
+        *)      print_error "Invalid module type: $type"; exit 1 ;;
     esac
-    
-    # Get existing module numbers
-    local existing_numbers=($(find "$MODULES_DIR" -maxdepth 1 -name "${pattern}-*.sh*" | sed -n "s/.*\/\([0-9]\+\).*/\1/p" | sort -n))
-    
-    # Find first available number in range
-    local num=$start
-    while [[ $num -le $end ]]; do
-        if [[ ! " ${existing_numbers[@]} " =~ " ${num} " ]]; then
-            echo "$num"
-            return 0
-        fi
-        ((num++))
+
+    local used
+    used=$(find "$MODULES_DIR" -maxdepth 1 -name '[0-9][0-9]-*' \
+        | sed -n 's|.*/\([0-9]\{2\}\)-.*|\1|p' | sort -u)
+
+    local n
+    for (( n=start; n<=end; n++ )); do
+        grep -qx "$(printf '%02d' "$n")" <<< "$used" || { printf '%02d' "$n"; return 0; }
     done
-    
     print_error "No available numbers in range $start-$end"
     exit 1
 }
 
-# Function to create module files from template
 create_module() {
-    local type="$1"
-    local number="$2"
-    local name="$3"
-    local description="$4"
-    
-    # Validate inputs
-    if [[ ! -d "${TEMPLATES_DIR}/${type}" ]]; then
-        print_error "Template directory not found: ${TEMPLATES_DIR}/${type}"
+    local type="$1" number="$2" name="$3" description="$4"
+
+    local tdir="${TEMPLATES_DIR}/${type}"
+    if [[ ! -d "$tdir" ]]; then
+        print_error "Template directory not found: $tdir"
         exit 1
     fi
-    
-    # Create module name with number prefix
-    local module_base="${number}-${name}"
-    local module_script="${MODULES_DIR}/${module_base}.sh"
-    local module_doc="${MODULES_DIR}/${module_base}.md"
-    
-    # Copy templates
-    cp "${TEMPLATES_DIR}/${type}/template.sh" "$module_script"
-    cp "${TEMPLATES_DIR}/${type}/template.md" "$module_doc"
-    
-    # Replace placeholders in script
-    sed -i "s/REPLACE_MODULE_NAME/${name}/g" "$module_script"
-    sed -i "s/REPLACE_MODULE_NUMBER/${number}/g" "$module_script"
-    sed -i "s/REPLACE_MODULE_DESCRIPTION/${description}/g" "$module_script"
-    sed -i "s/REPLACE_HEADER_TEXT/${name^^}/g" "$module_script"
-    
-    # Replace placeholders in documentation
-    sed -i "s/REPLACE_MODULE_NAME/${name}/g" "$module_doc"
-    sed -i "s/REPLACE_MODULE_NUMBER/${number}/g" "$module_doc"
-    
-    # Make script executable
-    chmod +x "$module_script"
-    
-    print_success "Created new ${type} module:"
-    print_status "${INFO_ICON}" "Script: ${module_script}"
-    print_status "${INFO_ICON}" "Documentation: ${module_doc}"
-    
-    # Git commit reminder
-    echo -e "\n${CYAN}${BOLD}Next Steps:${NC}"
-    echo -e "${CYAN}•${NC} Review and customize the module files"
-    echo -e "${CYAN}•${NC} Test the module functionality"
-    echo -e "${CYAN}•${NC} Commit your changes using semantic commit messages:"
-    echo -e "  ${GREEN}git add ${module_script} ${module_doc}${NC}"
-    echo -e "  ${GREEN}git commit -m 'feat: add ${name} module'${NC}"
-    echo -e "\nCommit Message Prefixes:"
-    echo -e "${YELLOW}• feat:${NC}     (new feature)"
-    echo -e "${YELLOW}• fix:${NC}      (bug fix)"
-    echo -e "${YELLOW}• docs:${NC}     (documentation changes)"
-    echo -e "${YELLOW}• style:${NC}    (formatting, etc; no code change)"
-    echo -e "${YELLOW}• refactor:${NC} (refactoring code)"
-    echo -e "${YELLOW}• test:${NC}     (adding tests)"
-    echo -e "${YELLOW}• chore:${NC}    (maintenance)"
-    echo -e "${YELLOW}• stable:${NC}   (marking a functional stopping point)"
-    
-    # Deployment reminder
-    echo -e "\n${CYAN}${BOLD}Deployment:${NC}"
-    echo -e "${CYAN}•${NC} After testing and committing your changes, deploy your module using:"
-    echo -e "  ${GREEN}./deploy.sh${NC}"
-    echo -e "${CYAN}•${NC} This will properly install your module to the system-wide location"
+
+    local base="${number}-${name}"
+    local script="${MODULES_DIR}/${base}.sh"
+    local doc="${MODULES_DIR}/${base}.md"
+
+    cp "${tdir}/template.sh" "$script"
+    [[ -f "${tdir}/template.md" ]] && cp "${tdir}/template.md" "$doc"
+
+    local upper
+    upper=$(tr '[:lower:]' '[:upper:]' <<< "$name")
+
+    sed -i \
+        -e "s/REPLACE_MODULE_NAME/${name}/g" \
+        -e "s/REPLACE_MODULE_NUMBER/${number}/g" \
+        -e "s/REPLACE_MODULE_DESCRIPTION/${description}/g" \
+        -e "s/REPLACE_HEADER_TEXT/${upper}/g" \
+        "$script"
+
+    [[ -f "$doc" ]] && sed -i \
+        -e "s/REPLACE_MODULE_NAME/${name}/g" \
+        -e "s/REPLACE_MODULE_NUMBER/${number}/g" \
+        "$doc"
+
+    chmod +x "$script"
+
+    print_success "Created ${type} module:"
+    print_status "${ICONS[info]}" "Script: $script"
+    [[ -f "$doc" ]] && print_status "${ICONS[info]}" "Docs:   $doc"
+
+    cat << EOF
+
+${CYAN}${BOLD}Next steps${NC}
+  ${CYAN}•${NC} Edit ${script#"$SCRIPT_DIR/"} — fill in MODULE_REQUIRES and run_update
+  ${CYAN}•${NC} Test: ${GREEN}update-arch --only ${name}${NC}
+  ${CYAN}•${NC} Commit: ${GREEN}git add ${script#"$SCRIPT_DIR/"} && git commit -m 'feat: add ${name} module'${NC}
+  ${CYAN}•${NC} Deploy: ${GREEN}./deploy.sh${NC}
+EOF
 }
 
-# Main execution
 main() {
+    if [[ $# -eq 0 ]]; then
+        show_help
+        exit 0
+    fi
+
     local module_type=""
-    
-    # Parse command line arguments
-    while [[ $# -gt 0 ]]; do
+    while (( $# > 0 )); do
         case "$1" in
-            -h|--help)
-                show_help
-                exit 0
-                ;;
-            -t|--type)
-                module_type="$2"
-                shift 2
-                ;;
-            *)
-                print_error "Unknown option: $1"
-                show_help
-                exit 1
-                ;;
+            -h|--help) show_help; exit 0 ;;
+            -t|--type) module_type="$2"; shift 2 ;;
+            *)         print_error "Unknown option: $1"; show_help; exit 1 ;;
         esac
     done
-    
-    # Validate module type
+
     if [[ ! "$module_type" =~ ^(system|user|status)$ ]]; then
         print_error "Invalid or missing module type"
         show_help
         exit 1
     fi
-    
-    # Get next available number
-    local number=$(get_next_module_number "$module_type")
-    
-    # Interactive prompts
-    print_header "${INFO_ICON} CREATE NEW ${module_type^^} MODULE"
-    
-    # Get module name
-    echo -e "\n${CYAN}Enter module name (e.g., pacman-update):${NC}"
+
+    local number
+    number=$(get_next_module_number "$module_type")
+
+    local upper_type
+    upper_type=$(tr '[:lower:]' '[:upper:]' <<< "$module_type")
+    print_header "${ICONS[info]} CREATE NEW ${upper_type} MODULE"
+
+    echo -e "\n${CYAN}Module name (e.g., pacman-update):${NC}"
+    local name
     read -r name
-    if [[ -z "$name" ]]; then
-        print_error "Module name cannot be empty"
-        exit 1
-    fi
-    
-    # Get module description
-    echo -e "\n${CYAN}Enter module description:${NC}"
+    [[ -z "$name" ]] && { print_error "Module name cannot be empty"; exit 1; }
+
+    echo -e "\n${CYAN}Module description:${NC}"
+    local description
     read -r description
-    if [[ -z "$description" ]]; then
-        print_error "Module description cannot be empty"
-        exit 1
-    fi
-    
-    # Create the module
+    [[ -z "$description" ]] && { print_error "Module description cannot be empty"; exit 1; }
+
     create_module "$module_type" "$number" "$name" "$description"
 }
 
-# If script is run directly
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
     main "$@"
 fi

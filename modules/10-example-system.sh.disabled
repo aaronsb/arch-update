@@ -1,71 +1,29 @@
 #!/bin/bash
-#
-# Example System Module (10-29 priority range)
-# Demonstrates core system maintenance tasks with educational output
-#
-# This module serves as a template and learning resource for system-level modules.
-# It demonstrates proper module structure, error handling, safety features, and
-# documentation practices used throughout the update system.
-#
-# Safety: Read-only operations for demonstration
-# Educational: Includes links to official documentation
+# Example system module — copy and customize to create your own.
+# Rename to NN-myname.sh (any free number in 10-49) to enable.
 
-# Module type declaration
 MODULE_TYPE="system"
+MODULE_NAME="example-system"
+MODULE_DESCRIPTION="Read-only demo of the system-module shape"
+MODULE_REQUIRES="pacman"
+MODULE_DRY_RUN_SAFE="true"
 
-# Source utils if not already sourced
-if ! command -v print_header &>/dev/null; then
-    source "$(dirname "$(dirname "$(readlink -f "$0")")")/utils.sh"
-fi
-
-# Check if this module can run
-check_supported() {
-    # Example: check if pacman exists (it should on Arch!)
-    command -v pacman &>/dev/null
-    return $?
-}
-
-# Run the update process
 run_update() {
-    print_header "${INFO_ICON} SYSTEM MAINTENANCE EXAMPLE"
-    
-    # Module Structure Example
-    print_section_box \
-        "Module Structure Example" \
-        "1. Header with description and safety info\n2. MODULE_TYPE declaration\n3. Utils sourcing check\n4. Support check function\n5. Main update function" \
-        "https://wiki.archlinux.org/title/Bash_scripting"
-    
-    # Error Handling Example
-    print_status "${INFO_ICON}" "=== Error Handling Example ==="
-    print_status "${SYNC_ICON}" "Checking package cache size..."
-    if ! cache_size=$(du -sh /var/cache/pacman/pkg/ 2>/dev/null | cut -f1); then
-        print_error "Failed to check cache size"
-        print_info_box "Common issues:\n- Directory permissions\n- Disk mount status"
-        return 1
-    fi
-    print_info_box "Package cache size: ${cache_size}"
-    
-    # Safety Features Example
-    print_section_box \
-        "Safety Features Example" \
-        "1. Backup critical data\n2. Version comparison before updates\n3. Rollback capabilities\n4. Permission checks" \
-        "https://wiki.archlinux.org/title/System_backup"
-    
-    # Documentation Example
-    print_section_box \
-        "Documentation Example" \
-        "Each module includes:\n1. Detailed .md file\n2. Usage examples\n3. Troubleshooting guide\n4. Related documentation" \
-        "https://wiki.archlinux.org/title/Help:Reading"
-    
-    return 0
-}
+    print_header "${ICONS[info]} SYSTEM MODULE EXAMPLE"
 
-# If script is run directly, check support and run
-if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
-    if check_supported; then
-        run_update
-    else
-        echo "Module requirements not met"
-        exit 1
+    print_section_box \
+        "Module Shape" \
+        "1. Declarative metadata at the top\n2. Optional check_supported override\n3. run_update does the work" \
+        "https://wiki.archlinux.org/title/Bash_scripting"
+
+    local cache_size
+    cache_size=$(du -sh /var/cache/pacman/pkg/ 2>/dev/null | cut -f1)
+    print_info_box "Package cache size: ${cache_size:-unknown}"
+
+    if [[ -n "$DRY_RUN" ]]; then
+        print_status "${ICONS[info]}" "Would: real modules do work here"
+        return 0
     fi
-fi
+
+    print_success "Example completed"
+}

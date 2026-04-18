@@ -1,38 +1,47 @@
 #!/bin/bash
+#
+# Dev helper: show what update-arch detects about the current terminal.
+# Not deployed — listed in .deployignore.
 
-# Source utilities
-source utils.sh
+source "$(dirname "$(readlink -f "$0")")/utils.sh"
 
-print_header "Terminal Detection Test"
+show_help() {
+    cat << EOF
+test-terminal.sh: report detected terminal and relevant env vars.
 
-# Run the detection test
-test_terminal_detection
+Usage: ./test-terminal.sh <command>
 
-# Example of using terminal detection in a script
-term_info=$(detect_terminal)
-echo -e "\n${CYAN}${BOLD}Example Usage:${NC}"
-case "$term_info" in
-    *"vscode"*)
-        print_success "VSCode-specific features enabled"
-        ;;
-    *"tmux"*)
-        print_success "tmux-specific features enabled"
-        ;;
-    *"kitty"* | *"alacritty"*)
-        print_success "GPU-accelerated terminal features enabled"
-        ;;
+Commands:
+  --run         Run the terminal detection report
+  -h, --help    Show this help
+EOF
+}
+
+run_report() {
+    print_header "Terminal Detection Test"
+
+    test_terminal_detection
+
+    local term_info
+    term_info=$(detect_terminal)
+    echo -e "\n${CYAN}${BOLD}Example Usage:${NC}"
+    case "$term_info" in
+        *vscode*)              print_success "VSCode-specific features enabled" ;;
+        *tmux*)                print_success "tmux-specific features enabled" ;;
+        *kitty*|*alacritty*)   print_success "GPU-accelerated terminal features enabled" ;;
+    esac
+
+    echo -e "\n${CYAN}${BOLD}Relevant Environment Variables:${NC}"
+    local var
+    for var in TERM_PROGRAM TERM TMUX STY KITTY_WINDOW_ID ALACRITTY_LOG \
+               GNOME_TERMINAL_SERVICE KONSOLE_VERSION TERMINATOR_UUID \
+               WEZTERM_PANE TILIX_ID; do
+        echo -e "${GREEN}${var}=${NC}${!var}"
+    done
+}
+
+case "${1:-}" in
+    --run)       run_report ;;
+    -h|--help|"") show_help ;;
+    *)           echo "Unknown option: $1" >&2; exit 1 ;;
 esac
-
-# Show all environment variables that helped with detection
-echo -e "\n${CYAN}${BOLD}Relevant Environment Variables:${NC}"
-echo -e "${GREEN}TERM_PROGRAM=${NC}$TERM_PROGRAM"
-echo -e "${GREEN}TERM=${NC}$TERM"
-echo -e "${GREEN}TMUX=${NC}$TMUX"
-echo -e "${GREEN}STY=${NC}$STY"
-echo -e "${GREEN}KITTY_WINDOW_ID=${NC}$KITTY_WINDOW_ID"
-echo -e "${GREEN}ALACRITTY_LOG=${NC}$ALACRITTY_LOG"
-echo -e "${GREEN}GNOME_TERMINAL_SERVICE=${NC}$GNOME_TERMINAL_SERVICE"
-echo -e "${GREEN}KONSOLE_VERSION=${NC}$KONSOLE_VERSION"
-echo -e "${GREEN}TERMINATOR_UUID=${NC}$TERMINATOR_UUID"
-echo -e "${GREEN}WEZTERM_PANE=${NC}$WEZTERM_PANE"
-echo -e "${GREEN}TILIX_ID=${NC}$TILIX_ID"
