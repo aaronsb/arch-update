@@ -4,7 +4,7 @@
 # Performs system health checks, package updates, and maintenance tasks
 
 SCRIPT_DIR="$(dirname "$(readlink -f "$0")")"
-VERSION="0.4.10"
+VERSION="0.4.11"
 
 source "$SCRIPT_DIR/utils.sh"
 source "$SCRIPT_DIR/system-check.sh"
@@ -39,13 +39,21 @@ start_sudo_keepalive() {
         print_error "Failed to establish sudo session"
         return 1
     }
-    ( while true; do sudo -v; sleep 60; done; ) &
+    # Detach fds from the parent so the bg loop (and its sleep child) don't
+    # hold the parent pipeline's stdout open. Without this redirect, when
+    # main runs as `main | tee log`, an orphaned `sleep 60` keeps tee's
+    # stdin alive after main returns — script appears to hang up to 60s.
+    ( while true; do sudo -v; sleep 60; done ) </dev/null >/dev/null 2>&1 &
     SUDO_REFRESH_PID=$!
     return 0
 }
 
 stop_sudo_keepalive() {
-    [[ -n "$SUDO_REFRESH_PID" ]] && kill "$SUDO_REFRESH_PID" 2>/dev/null
+    [[ -n "$SUDO_REFRESH_PID" ]] || return
+    # Kill the subshell's children first (sleep is the long-lived one),
+    # then the subshell itself. SIGTERM is enough; sleep responds to it.
+    pkill -P "$SUDO_REFRESH_PID" 2>/dev/null
+    kill "$SUDO_REFRESH_PID" 2>/dev/null
     SUDO_REFRESH_PID=""
 }
 
