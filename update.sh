@@ -149,6 +149,9 @@ ${BOLD}Options:${NC}
     ${GREEN}--list${NC}                  List installed modules with their metadata
     ${GREEN}--test${NC}                  Lamp-check: verify every module is reachable and valid
     ${GREEN}--only <name>${NC}           Run a single module by name (substring match)
+    ${GREEN}--check-update${NC}          Check upstream for a newer update-arch (no changes)
+    ${GREEN}--update${NC}                Apply an upstream update (prompts on conflicts)
+    ${GREEN}--uninstall${NC}             Remove update-arch (prompts; preserves edited files)
     ${GREEN}--create-module${NC}         Create a new module from template
     ${GREEN}--configure-terminal${NC}    Configure terminal preferences
 
@@ -179,6 +182,9 @@ case "$1" in
     --create-module)        shift; exec "${SCRIPT_DIR}/create-module.sh" "$@" ;;
     --list)                 list_modules "$SCRIPT_DIR/modules"; exit 0 ;;
     --test)                 run_self_test "$SCRIPT_DIR/modules"; exit $? ;;
+    --check-update)         exec "$SCRIPT_DIR/update-self.sh" --check ;;
+    --update)               shift; exec "$SCRIPT_DIR/update-self.sh" --run "$@" ;;
+    --uninstall)            shift; exec "$SCRIPT_DIR/uninstall.sh" --run "$@" ;;
     --only)
         shift
         [[ -z "$1" ]] && { print_error "--only requires a module name"; exit 1; }
