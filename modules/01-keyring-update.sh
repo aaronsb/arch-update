@@ -32,7 +32,7 @@ run_update() {
     fi
 
     print_status "${ICONS[sync]}" "Verifying trust database..."
-    if pacman-key --check-trustdb &>/dev/null; then
+    if sudo pacman-key --updatedb &>/dev/null; then
         print_success "Pacman keyring verified"
         return 0
     fi
@@ -50,7 +50,7 @@ run_update() {
         print_warning "Failed to refresh keys (often transient)"
     fi
 
-    if ! pacman-key --check-trustdb &>/dev/null; then
+    if ! sudo pacman-key --updatedb &>/dev/null; then
         print_error "Trust database still invalid after update"
         return 1
     fi
