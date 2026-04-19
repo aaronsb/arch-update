@@ -16,6 +16,9 @@ UPDATE_ARCH_LOG_DIR="$UPDATE_ARCH_STATE_DIR/logs"
 UPDATE_ARCH_BACKUP_DIR="$UPDATE_ARCH_CACHE_DIR/backups"
 UPDATE_ARCH_LOCK_FILE="$UPDATE_ARCH_RUNTIME_DIR/update-arch.lock"
 UPDATE_ARCH_TERMINAL_CONF="$UPDATE_ARCH_CONFIG_DIR/terminal.conf"
+UPDATE_ARCH_MANIFEST="$UPDATE_ARCH_DATA_DIR/INSTALL_MANIFEST"
+UPDATE_ARCH_UPSTREAM_CONF_NAME="update-arch.conf"
+UPDATE_ARCH_UPSTREAM_CONF_USER="$UPDATE_ARCH_CONFIG_DIR/$UPDATE_ARCH_UPSTREAM_CONF_NAME"
 UPDATE_ARCH_MAX_LOGS=5
 
 # ---------------------------------------------------------------------------
@@ -309,6 +312,71 @@ setup_logging() {
         rm -f "${existing[$i]}"
     done
     return 0
+}
+
+# ---------------------------------------------------------------------------
+# Install manifest & upstream config
+# ---------------------------------------------------------------------------
+# INSTALL_MANIFEST: written by deploy.sh on install/update. Key=value pairs,
+# bash-sourceable. Records where the installed copy came from so --update
+# and the version banner can reason about it.
+#   INSTALLED_VERSION  - semver tag (e.g., "0.3.0")
+#   INSTALLED_COMMIT   - full commit SHA
+#   INSTALLED_AT       - ISO-8601 UTC timestamp
+#   INSTALLED_FROM     - "git" (local clone) | "tarball" (curl install / --update)
+#   INSTALLED_REF      - git tag or branch name
+#
+# update-arch.conf: repo coordinates. Shipped alongside the code, and also
+# honoured at $XDG_CONFIG_HOME/update-arch/update-arch.conf for user overrides.
+#   REPO_OWNER, REPO_NAME, UPDATE_CHANNEL, UPDATE_BRANCH
+
+read_install_manifest() {
+    INSTALLED_VERSION=""
+    INSTALLED_COMMIT=""
+    INSTALLED_AT=""
+    INSTALLED_FROM=""
+    INSTALLED_REF=""
+    [[ -r "$UPDATE_ARCH_MANIFEST" ]] || return 1
+    # shellcheck disable=SC1090
+    source "$UPDATE_ARCH_MANIFEST"
+    return 0
+}
+
+read_upstream_config() {
+    REPO_OWNER=""
+    REPO_NAME=""
+    UPDATE_CHANNEL="tag"
+    UPDATE_BRANCH="main"
+
+    local deployed="$UPDATE_ARCH_DATA_DIR/$UPDATE_ARCH_UPSTREAM_CONF_NAME"
+    local repo_local="$(dirname "${BASH_SOURCE[0]}")/$UPDATE_ARCH_UPSTREAM_CONF_NAME"
+
+    # Prefer deployed, fall back to the repo-local copy (dev path).
+    # shellcheck disable=SC1090
+    if   [[ -r "$deployed"    ]]; then source "$deployed"
+    elif [[ -r "$repo_local"  ]]; then source "$repo_local"
+    fi
+
+    # User override wins.
+    # shellcheck disable=SC1090
+    [[ -r "$UPDATE_ARCH_UPSTREAM_CONF_USER" ]] && source "$UPDATE_ARCH_UPSTREAM_CONF_USER"
+
+    [[ -n "$REPO_OWNER" && -n "$REPO_NAME" ]]
+}
+
+# One-line version banner. Reads manifest; falls back to static VERSION if
+# manifest is absent (running from a dev checkout pre-deploy).
+show_version_banner() {
+    local fallback_version="${1:-unknown}"
+    if read_install_manifest; then
+        local short="${INSTALLED_COMMIT:0:7}"
+        local date_part="${INSTALLED_AT%%T*}"
+        printf '%s %s (%s) — installed %s from %s\n' \
+            "update-arch" "$INSTALLED_VERSION" "${short:-unknown}" \
+            "${date_part:-unknown}" "${INSTALLED_FROM:-unknown}"
+    else
+        printf 'update-arch %s (not deployed; running from source)\n' "$fallback_version"
+    fi
 }
 
 # ---------------------------------------------------------------------------

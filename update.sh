@@ -69,6 +69,7 @@ main() {
         confirm_dry_run_sudo
     else
         print_header "${ICONS[clock]} SYSTEM UPDATE STARTED AT $(date)"
+        print_status "${ICONS[info]}" "$(show_version_banner "$VERSION")"
         [[ -n "$UPDATE_ARCH_CURRENT_LOG" ]] && \
             print_status "${ICONS[info]}" "Logging to $UPDATE_ARCH_CURRENT_LOG"
     fi
@@ -134,6 +135,8 @@ configure_terminal() {
 
 show_help() {
     cat << EOF
+$(show_version_banner "$VERSION")
+
 ${CYAN}${BOLD}update-arch${NC}: Arch Linux system update script (user scope)
 
 ${BOLD}Usage:${NC} update-arch [OPTIONS]
@@ -159,7 +162,7 @@ For more information, see: ${BLUE}${UPDATE_ARCH_DATA_DIR}/README.md${NC}
 EOF
 }
 
-show_version() { echo "update-arch version $VERSION"; }
+show_version() { show_version_banner "$VERSION"; }
 
 # -----------------------------------------------------------------------------
 # Entry point

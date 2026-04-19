@@ -25,10 +25,50 @@ fi
 SCRIPT_NAME="update-arch"
 REQUIRED_DEPS="bash sudo pacman systemctl"
 
+# Install provenance is passed in by the bootstrap (install.sh) or --update
+# via env vars; deploy.sh falls back to reading from git if available.
+: "${UPDATE_ARCH_INSTALL_FROM:=}"     # "git" | "tarball"
+: "${UPDATE_ARCH_INSTALL_REF:=}"      # tag or branch name
+: "${UPDATE_ARCH_INSTALL_COMMIT:=}"   # full sha
+: "${UPDATE_ARCH_INSTALL_VERSION:=}"  # semver
+
 get_version() {
     local line
     line=$(grep "^VERSION=" "update.sh")
     echo "${line#VERSION=}" | tr -d '"'
+}
+
+# Resolve install provenance. Prefers explicit env vars (set by install.sh or
+# --update). Falls back to `git` when running from a working tree.
+resolve_install_provenance() {
+    RESOLVED_FROM="${UPDATE_ARCH_INSTALL_FROM:-}"
+    RESOLVED_REF="${UPDATE_ARCH_INSTALL_REF:-}"
+    RESOLVED_COMMIT="${UPDATE_ARCH_INSTALL_COMMIT:-}"
+    RESOLVED_VERSION="${UPDATE_ARCH_INSTALL_VERSION:-$(get_version)}"
+
+    if [[ -z "$RESOLVED_FROM" ]] && git rev-parse --is-inside-work-tree &>/dev/null; then
+        RESOLVED_FROM="git"
+        [[ -z "$RESOLVED_COMMIT" ]] && RESOLVED_COMMIT=$(git rev-parse HEAD 2>/dev/null)
+        [[ -z "$RESOLVED_REF"    ]] && RESOLVED_REF=$(git describe --tags --exact-match 2>/dev/null \
+                                                   || git rev-parse --abbrev-ref HEAD 2>/dev/null)
+    fi
+    RESOLVED_FROM="${RESOLVED_FROM:-unknown}"
+}
+
+write_install_manifest() {
+    local manifest="$UPDATE_ARCH_DATA_DIR/INSTALL_MANIFEST"
+    local now
+    now=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
+
+    cat > "$manifest" << EOF
+# Written by deploy.sh on install/update. Source of truth for the version
+# banner and the --update flow.
+INSTALLED_VERSION="$RESOLVED_VERSION"
+INSTALLED_COMMIT="$RESOLVED_COMMIT"
+INSTALLED_AT="$now"
+INSTALLED_FROM="$RESOLVED_FROM"
+INSTALLED_REF="$RESOLVED_REF"
+EOF
 }
 
 check_dependencies() {
@@ -333,8 +373,10 @@ install() {
         [[ -n "$extras" ]] && handle_extra_files "$extras"
     fi
 
+    resolve_install_provenance
     create_directories || return 1
     copy_files         || return 1
+    write_install_manifest
     create_symlink     || return 1
     configure_terminal_preferences
 
