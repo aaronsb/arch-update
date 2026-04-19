@@ -77,6 +77,27 @@ upstream_commit() {
     curl -fsSL "${api_base}/commits/${ref}" 2>/dev/null | json_field sha
 }
 
+# Rewrite INSTALL_MANIFEST with a new ref without re-deploying any files.
+# Used when upstream's pointer moved but the commit it points at is the
+# same one we already have installed (e.g., a release got tagged at HEAD).
+# Preserves INSTALLED_AT — the code hasn't been re-installed, only relabelled.
+refresh_manifest_ref() {
+    local new_ref="$1" new_sha="$2"
+    local new_version="$INSTALLED_VERSION"
+    # Treat "vX.Y.Z" and "X.Y.Z" refs as semver tags; update the recorded
+    # version to match. Anything else leaves INSTALLED_VERSION alone.
+    [[ "$new_ref" =~ ^v?[0-9]+\.[0-9]+\.[0-9]+$ ]] && new_version="${new_ref#v}"
+
+    cat > "$UPDATE_ARCH_MANIFEST" << EOF
+# Refreshed by update-self.sh (ref change only, commit unchanged).
+INSTALLED_VERSION="$new_version"
+INSTALLED_COMMIT="$new_sha"
+INSTALLED_AT="$INSTALLED_AT"
+INSTALLED_FROM="$INSTALLED_FROM"
+INSTALLED_REF="$new_ref"
+EOF
+}
+
 # ---------------------------------------------------------------------------
 # --check — print comparison, no changes
 # ---------------------------------------------------------------------------
@@ -185,11 +206,19 @@ do_run() {
     fi
 
     print_header "${ICONS[sync]} updating update-arch"
-    print_status "${ICONS[info]}" "Installed: $INSTALLED_VERSION (${INSTALLED_COMMIT:0:7})"
+    print_status "${ICONS[info]}" "Installed: $INSTALLED_VERSION (${INSTALLED_COMMIT:0:7}) ref=$INSTALLED_REF"
     print_status "${ICONS[info]}" "Upstream:  $upstream_ref (${upstream_sha:0:7})"
 
     if [[ "$upstream_sha" == "$INSTALLED_COMMIT" ]]; then
-        print_success "Already up to date"
+        # Code is already current. If the ref label drifted (e.g., we
+        # installed from main and a tag was cut at the same commit),
+        # refresh just the manifest — no file changes.
+        if [[ "$upstream_ref" != "$INSTALLED_REF" ]]; then
+            refresh_manifest_ref "$upstream_ref" "$upstream_sha"
+            print_success "Already at ${upstream_sha:0:7}; manifest ref updated $INSTALLED_REF → $upstream_ref"
+        else
+            print_success "Already up to date"
+        fi
         return 0
     fi
 
