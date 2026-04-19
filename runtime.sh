@@ -267,6 +267,17 @@ run_self_test() {
         ((warnings++))
     fi
 
+    # Optional markdown renderer for prettier release notes. Not needed.
+    local md_renderer=""
+    for candidate in glow mdcat bat; do
+        command -v "$candidate" &>/dev/null && { md_renderer="$candidate"; break; }
+    done
+    if [[ -n "$md_renderer" ]]; then
+        _lamp_line OK "markdown renderer: $md_renderer (release notes will be formatted)"
+    else
+        _lamp_line SKIP "no markdown renderer (release notes print as plain text — optional: glow)"
+    fi
+
     echo
     echo "${BOLD}Modules${NC}"
 

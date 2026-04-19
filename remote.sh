@@ -89,6 +89,10 @@ upstream_release_body() {
 
 # Print release notes with a header. Silent if the tag has no release body
 # (branch channel, untagged commits, API error).
+#
+# If a markdown renderer is present on PATH, use it for nicer output —
+# checked in preference order: glow > mdcat > bat. Plain indented text is
+# always a valid fallback. Optional: install `glow` for the best result.
 print_release_notes() {
     local tag="$1"
     local body
@@ -97,6 +101,18 @@ print_release_notes() {
 
     echo
     print_header "${ICONS[info]} release notes: $tag"
-    sed 's/^/  /' <<< "$body"
+
+    # Only render when stdout is a real terminal. When we're being tee'd
+    # into a log (--run), or piped anywhere else, produce plain text —
+    # ANSI escape codes in log files are garbage.
+    if [[ -t 1 ]] && command -v glow &>/dev/null; then
+        glow -s auto - <<< "$body"
+    elif [[ -t 1 ]] && command -v mdcat &>/dev/null; then
+        mdcat <<< "$body"
+    elif [[ -t 1 ]] && command -v bat &>/dev/null; then
+        bat --language=markdown --style=plain --paging=never <<< "$body"
+    else
+        sed 's/^/  /' <<< "$body"
+    fi
     echo
 }

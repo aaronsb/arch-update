@@ -152,6 +152,12 @@ Required: `bash`, `sudo`, `pacman`, `systemctl`, `flock`.
 Optional (enables the matching module): `reflector`, `paccache`, `yay` or
 `paru`, `flatpak`, `oh-my-posh`, `fastfetch`, `checkupdates`.
 
+Optional (improves output): `glow` renders release notes as formatted
+markdown when `--check-update` / `--update` finds a new version. Falls
+back to plain indented text if none of `glow` / `mdcat` / `bat` are on
+PATH. Only applied when stdout is an interactive terminal — tee'd logs
+stay plain.
+
 ## Locking and concurrency
 
 `update-arch --run` takes an `flock` on `$XDG_RUNTIME_DIR/update-arch.lock` at
