@@ -122,8 +122,12 @@ resolve_conflict() {
         echo "  [K]eep local  [A]ccept new  [D]iff  [M]erge  [S]kip  [Q]uit"
         echo -n "  choice: "
 
+        # Read from /dev/tty explicitly: do_run calls us from inside a
+        # `while read ... done < <(find ...)` loop, so $stdin is the find
+        # pipe. Without this redirect, read returns immediately and we
+        # spin forever.
         local choice
-        read -r choice
+        read -r choice < /dev/tty
         case "$choice" in
             k|K) return 0 ;;                                    # keep local
             a|A) cp "$new_path" "$local_path"; return 0 ;;      # accept new
@@ -145,7 +149,7 @@ resolve_conflict() {
 
                 echo "  Use merged result? [y/N] "
                 local confirm
-                read -r confirm
+                read -r confirm < /dev/tty
                 if [[ "$confirm" =~ ^[Yy] ]]; then
                     cp "$merge_file" "$local_path"
                     rm -f "$merge_file"

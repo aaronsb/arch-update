@@ -434,25 +434,31 @@ ${BOLD}Paths (XDG):${NC}
 EOF
 }
 
-if [[ $# -eq 0 ]]; then
-    show_help
-    exit 0
-fi
+# Only parse args and dispatch when invoked directly. When sourced (e.g.,
+# by update-self.sh's post-update subshell to reuse write_install_hashes /
+# write_install_manifest), the top-level would otherwise see the caller's
+# $@, not match any command, and exit 1 — short-circuiting the caller.
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    if [[ $# -eq 0 ]]; then
+        show_help
+        exit 0
+    fi
 
-ASSUME_YES="no"
-COMMAND=""
-while (( $# > 0 )); do
-    case "$1" in
-        -h|--help)   show_help; exit 0 ;;
-        --install)   COMMAND="install"; shift ;;
-        --uninstall) COMMAND="uninstall"; shift ;;
-        --yes|-y)    ASSUME_YES="yes"; shift ;;
-        *)           print_error "Unknown option: $1"; show_help; exit 1 ;;
+    ASSUME_YES="no"
+    COMMAND=""
+    while (( $# > 0 )); do
+        case "$1" in
+            -h|--help)   show_help; exit 0 ;;
+            --install)   COMMAND="install"; shift ;;
+            --uninstall) COMMAND="uninstall"; shift ;;
+            --yes|-y)    ASSUME_YES="yes"; shift ;;
+            *)           print_error "Unknown option: $1"; show_help; exit 1 ;;
+        esac
+    done
+
+    case "$COMMAND" in
+        install)   install ;;
+        uninstall) uninstall "$ASSUME_YES" ;;
+        *)         show_help; exit 1 ;;
     esac
-done
-
-case "$COMMAND" in
-    install)   install ;;
-    uninstall) uninstall "$ASSUME_YES" ;;
-    *)         show_help; exit 1 ;;
-esac
+fi
