@@ -346,6 +346,10 @@ do_run() {
     print_status "${ICONS[info]}" "Kept local:   $kept_local"
     (( skipped > 0 )) && print_warning "Skipped (unresolved): $skipped"
 
+    # Re-read the manifest we just wrote and confirm the new state.
+    read_install_manifest
+    print_status "${ICONS[success]}" "Now at: $(show_version_banner)"
+
     # Show release notes for tag-channel updates.
     [[ "$UPDATE_CHANNEL" == "tag" ]] && print_release_notes "$upstream_ref"
 }
