@@ -50,88 +50,8 @@ EOF
 
 have() { command -v "$1" &>/dev/null; }
 
-# ---------------------------------------------------------------------------
-# GitHub API (minimal: just tag/commit lookups)
-# ---------------------------------------------------------------------------
-json_field() {
-    local field="$1"
-    grep -oE "\"${field}\":[[:space:]]*\"[^\"]+\"" \
-        | head -n1 \
-        | sed -E "s/.*\"${field}\":[[:space:]]*\"([^\"]+)\".*/\1/"
-}
-
-upstream_latest_ref() {
-    local api_base="https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}"
-    if [[ "$UPDATE_CHANNEL" == "branch" ]]; then
-        echo "$UPDATE_BRANCH"
-    else
-        local tag
-        tag=$(curl -fsSL "${api_base}/releases/latest" 2>/dev/null | json_field tag_name)
-        echo "${tag:-main}"
-    fi
-}
-
-upstream_commit() {
-    local ref="$1"
-    local api_base="https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}"
-    curl -fsSL "${api_base}/commits/${ref}" 2>/dev/null | json_field sha
-}
-
-# Fetch the release body (notes) for a tag. Empty if the tag has no release
-# (e.g., UPDATE_CHANNEL=branch, or an untagged commit). Not a fatal error.
-upstream_release_body() {
-    local tag="$1"
-    [[ -z "$tag" ]] && return 0
-    local api_base="https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}"
-    # GitHub returns the body as a JSON string; extract it with python -c or
-    # a sed dance. Keep it shell-only with a minimal extractor that handles
-    # escaped newlines/quotes commonly found in release notes.
-    curl -fsSL "${api_base}/releases/tags/${tag}" 2>/dev/null \
-        | awk '
-            BEGIN { in_body = 0; depth = 0; out = "" }
-            /"body":[[:space:]]*"/ {
-                sub(/^.*"body":[[:space:]]*"/, "")
-                in_body = 1
-            }
-            in_body {
-                # Accumulate until we hit an unescaped closing quote.
-                line = $0
-                while (length(line) > 0) {
-                    c = substr(line, 1, 1)
-                    if (c == "\\" && length(line) > 1) {
-                        n = substr(line, 2, 1)
-                        if      (n == "n") out = out "\n"
-                        else if (n == "r") { }              # swallow CR
-                        else if (n == "t") out = out "\t"
-                        else if (n == "\"") out = out "\""
-                        else if (n == "\\") out = out "\\"
-                        else                 out = out n
-                        line = substr(line, 3)
-                    } else if (c == "\"") {
-                        in_body = 0
-                        line = ""
-                    } else {
-                        out = out c
-                        line = substr(line, 2)
-                    }
-                }
-            }
-            END { print out }
-        '
-}
-
-print_release_notes() {
-    local tag="$1"
-    local body
-    body=$(upstream_release_body "$tag")
-    [[ -z "$body" ]] && return 0
-
-    echo
-    print_header "${ICONS[info]} release notes: $tag"
-    # Indent for readability.
-    sed 's/^/  /' <<< "$body"
-    echo
-}
+# shellcheck source=./remote.sh
+source "$SCRIPT_DIR/remote.sh"
 
 # Rewrite INSTALL_MANIFEST with a new ref without re-deploying any files.
 # Used when upstream's pointer moved but the commit it points at is the
@@ -246,6 +166,31 @@ resolve_conflict() {
 # ---------------------------------------------------------------------------
 do_run() {
     local assume_yes="${1:-no}"
+
+    # -------------------------------------------------------------------
+    # Self-preservation: bash reads scripts lazily by file offset. If we
+    # let the update overwrite the running update-self.sh on disk, the
+    # next statement at the same offset can land in the middle of a
+    # different line of the new file — and blow up with a parse error.
+    #
+    # Fix: copy ourselves to a temp file and re-exec from there. The
+    # installed copy becomes free to mutate; we execute from /tmp.
+    # -------------------------------------------------------------------
+    if [[ -z "${UPDATE_ARCH_SELF_TEMP:-}" ]]; then
+        local self
+        self="$(readlink -f "$0")"
+        if [[ "$self" == "$UPDATE_ARCH_DATA_DIR"/* ]]; then
+            local temp
+            temp=$(mktemp --suffix=.sh)
+            cp "$self" "$temp"
+            chmod +x "$temp"
+            local args=(--run)
+            [[ "$assume_yes" == "yes" ]] && args+=(--yes)
+            UPDATE_ARCH_SELF_TEMP="$temp" exec "$temp" "${args[@]}"
+        fi
+    else
+        trap 'rm -f "$UPDATE_ARCH_SELF_TEMP"' EXIT
+    fi
 
     read_upstream_config  || { print_error "Upstream config not readable"; return 1; }
     read_install_manifest || { print_error "No INSTALL_MANIFEST — reinstall first"; return 1; }
