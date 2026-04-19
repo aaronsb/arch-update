@@ -13,8 +13,9 @@ check_system_health() {
     set_error_handlers
     print_header "${ICONS[info]} PERFORMING SYSTEM HEALTH CHECKS"
 
-    check_network    || return 1
-    check_disk_space || return 1
+    check_network     || return 1
+    check_disk_space  || return 1
+    check_pacman_lock || return 1
     return 0
 }
 

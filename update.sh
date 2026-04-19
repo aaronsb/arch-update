@@ -4,7 +4,7 @@
 # Performs system health checks, package updates, and maintenance tasks
 
 SCRIPT_DIR="$(dirname "$(readlink -f "$0")")"
-VERSION="0.4.8"
+VERSION="0.4.9"
 
 source "$SCRIPT_DIR/utils.sh"
 source "$SCRIPT_DIR/system-check.sh"
@@ -60,6 +60,11 @@ run_phase() {
 
 main() {
     acquire_run_lock || exit 1
+
+    # Load tunables from update-arch.conf so modules can read them.
+    # Failure here only means upstream coordinates are missing — fine for
+    # the run flow; --update is what actually needs them.
+    read_upstream_config >/dev/null 2>&1 || true
 
     if [[ -n "$DRY_RUN" ]]; then
         local bar="════════════════════════════════════════════════════════════════"

@@ -256,6 +256,39 @@ check_disk_space() {
     print_success "Sufficient disk space available"
 }
 
+# Detect a held or stale pacman db lock before any module runs. Catching this
+# up front avoids a long keyring/mirror/journal preamble that would only
+# discover the problem at the pacman -Syu step.
+check_pacman_lock() {
+    local lockfile="/var/lib/pacman/db.lck"
+    print_status "${ICONS[key]}" "Checking package manager state..."
+
+    if [[ ! -e "$lockfile" ]]; then
+        print_success "Package manager available"
+        return 0
+    fi
+
+    # Lock exists. Is anything actually holding the database open?
+    local holder=""
+    if command -v fuser &>/dev/null; then
+        holder=$(sudo fuser "$lockfile" 2>/dev/null | tr -s ' ' | sed 's/^ *//;s/ *$//')
+    fi
+    if [[ -z "$holder" ]] && command -v pgrep &>/dev/null; then
+        holder=$(pgrep -d ' ' -x 'pacman|pamac|pamacd|yay|paru|aurman|pikaur|trizen|pakku' 2>/dev/null)
+    fi
+
+    if [[ -n "$holder" ]]; then
+        print_error "Another package manager is running (pid: $holder)"
+        print_status "${ICONS[info]}" "Wait for it to finish, then re-run update-arch"
+        return 1
+    fi
+
+    print_error "Stale pacman lock found: $lockfile"
+    print_status "${ICONS[info]}" "No active package manager detected — a previous run was likely interrupted"
+    print_status "${ICONS[info]}" "Remove with: sudo rm $lockfile"
+    return 1
+}
+
 check_aur_helper() {
     for helper in yay paru; do
         if command -v "$helper" &>/dev/null; then
@@ -347,6 +380,7 @@ read_upstream_config() {
     REPO_NAME=""
     UPDATE_CHANNEL="tag"
     UPDATE_BRANCH="main"
+    MIRRORS_INTERVAL_DAYS="${MIRRORS_INTERVAL_DAYS:-30}"
 
     local deployed="$UPDATE_ARCH_DATA_DIR/$UPDATE_ARCH_UPSTREAM_CONF_NAME"
     local repo_local="$(dirname "${BASH_SOURCE[0]}")/$UPDATE_ARCH_UPSTREAM_CONF_NAME"
@@ -360,6 +394,8 @@ read_upstream_config() {
     # User override wins.
     # shellcheck disable=SC1090
     [[ -r "$UPDATE_ARCH_UPSTREAM_CONF_USER" ]] && source "$UPDATE_ARCH_UPSTREAM_CONF_USER"
+
+    export MIRRORS_INTERVAL_DAYS
 
     [[ -n "$REPO_OWNER" && -n "$REPO_NAME" ]]
 }
