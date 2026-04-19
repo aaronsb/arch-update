@@ -160,6 +160,17 @@ list_modified_files() {
     done < <(get_tracked_files)
 }
 
+# Files deploy.sh writes at install time. Not in git, not user extras.
+INSTALLER_MANAGED=(INSTALL_MANIFEST INSTALL_HASHES)
+
+is_installer_managed() {
+    local path="$1" m
+    for m in "${INSTALLER_MANAGED[@]}"; do
+        [[ "$path" == "$m" ]] && return 0
+    done
+    return 1
+}
+
 list_extra_files() {
     local tracked
     tracked=$(get_tracked_files)
@@ -168,6 +179,7 @@ list_extra_files() {
     local deployed rel
     while IFS= read -r deployed; do
         rel="${deployed#"$UPDATE_ARCH_DATA_DIR/"}"
+        is_installer_managed "$rel" && continue
         # grep -Fxq: exact whole-line match, so "utils.sh" doesn't match "utils.sh.bak"
         grep -Fxq "$rel" <<< "$tracked" || echo "$rel"
     done < <(find "$UPDATE_ARCH_DATA_DIR" -type f 2>/dev/null)
