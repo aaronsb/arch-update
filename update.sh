@@ -144,6 +144,7 @@ ${BOLD}Options:${NC}
     ${GREEN}--run${NC}                   Run the update process
     ${GREEN}--dry-run${NC}               Show what would be updated without making changes
     ${GREEN}--list${NC}                  List installed modules with their metadata
+    ${GREEN}--test${NC}                  Lamp-check: verify every module is reachable and valid
     ${GREEN}--only <name>${NC}           Run a single module by name (substring match)
     ${GREEN}--create-module${NC}         Create a new module from template
     ${GREEN}--configure-terminal${NC}    Configure terminal preferences
@@ -174,6 +175,7 @@ case "$1" in
     --configure-terminal)   configure_terminal; exit $? ;;
     --create-module)        shift; exec "${SCRIPT_DIR}/create-module.sh" "$@" ;;
     --list)                 list_modules "$SCRIPT_DIR/modules"; exit 0 ;;
+    --test)                 run_self_test "$SCRIPT_DIR/modules"; exit $? ;;
     --only)
         shift
         [[ -z "$1" ]] && { print_error "--only requires a module name"; exit 1; }

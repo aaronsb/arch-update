@@ -277,127 +277,6 @@ set_error_handlers() {
 }
 
 # ---------------------------------------------------------------------------
-# Module lifecycle
-# ---------------------------------------------------------------------------
-#
-# Modules declare metadata and implement `run_update`. The runtime:
-#   1. Sources the module in a subshell (isolates state).
-#   2. Validates MODULE_TYPE matches the expected phase.
-#   3. Auto-derives check_supported from MODULE_REQUIRES if not defined.
-#   4. Dispatches check_supported, then run_update.
-#
-# Metadata fields (declare at top of module):
-#   MODULE_TYPE        - "system" | "user" | "status" (required)
-#   MODULE_NAME        - display name (default: filename without prefix)
-#   MODULE_DESCRIPTION - one-line summary
-#   MODULE_REQUIRES    - space-separated commands that must exist on PATH
-#   MODULE_DRY_RUN_SAFE - "true" | "false" (default: "true")
-#
-validate_module_type() {
-    local module="$1" declared="$2" expected="$3"
-    if [[ "$declared" != "$expected" ]]; then
-        print_error "Module $(basename "$module"): MODULE_TYPE='$declared' but placed in '$expected' phase"
-        print_error "Move the module to the correct number range or fix MODULE_TYPE"
-        return 1
-    fi
-    return 0
-}
-
-run_module() {
-    local module="$1" expected_phase="$2"
-    local base
-    base=$(basename "$module")
-
-    if [[ ! -r "$module" ]]; then
-        print_warning "Module not readable: $base"
-        return 1
-    fi
-
-    (
-        set +e
-        MODULE_TYPE=""
-        MODULE_NAME=""
-        MODULE_DESCRIPTION=""
-        MODULE_REQUIRES=""
-        MODULE_DRY_RUN_SAFE="true"
-        unset -f check_supported run_update 2>/dev/null
-
-        # shellcheck disable=SC1090
-        if ! source "$module"; then
-            print_warning "Module $base failed to load"
-            exit 1
-        fi
-
-        if [[ -z "$MODULE_TYPE" ]]; then
-            print_error "Module $base: missing MODULE_TYPE"
-            exit 1
-        fi
-        validate_module_type "$module" "$MODULE_TYPE" "$expected_phase" || exit 1
-
-        if ! declare -F run_update >/dev/null; then
-            print_error "Module $base: no run_update() defined"
-            exit 1
-        fi
-
-        if ! declare -F check_supported >/dev/null; then
-            check_supported() {
-                local req
-                for req in $MODULE_REQUIRES; do
-                    command -v "$req" &>/dev/null || return 1
-                done
-                return 0
-            }
-        fi
-
-        if ! check_supported; then
-            print_status "${ICONS[info]}" "Module $base not supported on this system"
-            exit 0
-        fi
-
-        if [[ -n "$DRY_RUN" && "$MODULE_DRY_RUN_SAFE" != "true" ]]; then
-            print_status "${ICONS[info]}" "Module $base not dry-run safe; skipping"
-            exit 0
-        fi
-
-        run_update
-    )
-    local rc=$?
-    [[ $rc -ne 0 ]] && print_warning "Module $base exited with status $rc"
-    return 0
-}
-
-module_metadata() {
-    local module="$1"
-    (
-        set +e
-        MODULE_TYPE=""
-        MODULE_NAME=""
-        MODULE_DESCRIPTION=""
-        MODULE_REQUIRES=""
-        # shellcheck disable=SC1090
-        source "$module" 2>/dev/null || exit 0
-        local base
-        base=$(basename "$module" .sh)
-        printf '%s\t%s\t%s\t%s\n' \
-            "$base" \
-            "${MODULE_TYPE:-?}" \
-            "${MODULE_DESCRIPTION:-(no description)}" \
-            "${MODULE_REQUIRES:-}"
-    )
-}
-
-list_modules() {
-    local modules_dir="$1"
-    printf "%-28s %-8s %s\n" "MODULE" "TYPE" "DESCRIPTION"
-    printf "%-28s %-8s %s\n" "------" "----" "-----------"
-    local f name type desc
-    while IFS= read -r f; do
-        IFS=$'\t' read -r name type desc _ < <(module_metadata "$f")
-        printf "%-28s %-8s %s\n" "$name" "$type" "$desc"
-    done < <(find "$modules_dir" -maxdepth 1 -name "*.sh" | sort)
-}
-
-# ---------------------------------------------------------------------------
 # Run lock
 # ---------------------------------------------------------------------------
 acquire_run_lock() {
@@ -431,3 +310,9 @@ setup_logging() {
     done
     return 0
 }
+
+# ---------------------------------------------------------------------------
+# Module runtime (discovery, validation, dispatch, lamp-check)
+# ---------------------------------------------------------------------------
+# shellcheck source=./runtime.sh
+source "$(dirname "${BASH_SOURCE[0]}")/runtime.sh"
