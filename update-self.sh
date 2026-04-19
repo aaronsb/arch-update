@@ -171,25 +171,30 @@ do_run() {
     # Self-preservation: bash reads scripts lazily by file offset. If we
     # let the update overwrite the running update-self.sh on disk, the
     # next statement at the same offset can land in the middle of a
-    # different line of the new file — and blow up with a parse error.
+    # different line of the new file — parse error.
     #
-    # Fix: copy ourselves to a temp file and re-exec from there. The
-    # installed copy becomes free to mutate; we execute from /tmp.
+    # Fix: copy the whole runtime bundle (update-self.sh plus everything
+    # it sources — utils.sh, runtime.sh, remote.sh) to a temp dir and
+    # re-exec from there. Self-contained; the install dir is free to
+    # mutate while we execute from /tmp.
     # -------------------------------------------------------------------
     if [[ -z "${UPDATE_ARCH_SELF_TEMP:-}" ]]; then
         local self
         self="$(readlink -f "$0")"
         if [[ "$self" == "$UPDATE_ARCH_DATA_DIR"/* ]]; then
-            local temp
-            temp=$(mktemp --suffix=.sh)
-            cp "$self" "$temp"
-            chmod +x "$temp"
+            local tempdir
+            tempdir=$(mktemp -d -t update-arch-self.XXXXXX)
+            local f
+            for f in update-self.sh utils.sh runtime.sh remote.sh; do
+                cp "$UPDATE_ARCH_DATA_DIR/$f" "$tempdir/$f" 2>/dev/null
+            done
+            chmod +x "$tempdir/update-self.sh"
             local args=(--run)
             [[ "$assume_yes" == "yes" ]] && args+=(--yes)
-            UPDATE_ARCH_SELF_TEMP="$temp" exec "$temp" "${args[@]}"
+            UPDATE_ARCH_SELF_TEMP="$tempdir" exec "$tempdir/update-self.sh" "${args[@]}"
         fi
     else
-        trap 'rm -f "$UPDATE_ARCH_SELF_TEMP"' EXIT
+        trap 'rm -rf "$UPDATE_ARCH_SELF_TEMP"' EXIT
     fi
 
     read_upstream_config  || { print_error "Upstream config not readable"; return 1; }
