@@ -31,11 +31,13 @@ validate_module_type() {
 }
 
 # Map the numeric prefix (NN-name.sh) back to the expected phase name.
+# Ranges match update.sh's run_phase find patterns — keep them in sync or
+# modules become orphaned (probe_module flags this as ORPHAN).
 module_expected_phase() {
     local base="$1"
     local num="${base:0:2}"
     [[ "$num" =~ ^[0-9][0-9]$ ]] || { echo ""; return; }
-    if   (( 10#$num >= 10 && 10#$num <= 49 )); then echo "system"
+    if   (( 10#$num >= 0  && 10#$num <= 49 )); then echo "system"
     elif (( 10#$num >= 50 && 10#$num <= 89 )); then echo "user"
     elif (( 10#$num >= 90 && 10#$num <= 99 )); then echo "status"
     else echo ""
@@ -152,7 +154,12 @@ probe_module() {
 
         local expected
         expected=$(module_expected_phase "$base")
-        if [[ -n "$expected" && "$expected" != "$MODULE_TYPE" ]]; then
+        if [[ -z "$expected" ]]; then
+            # Unreachable: no phase's find pattern will pick this up.
+            emit "$type" "$desc" "ORPHAN" "prefix '${base:0:2}' outside any phase range (00-99)"
+            exit 0
+        fi
+        if [[ "$expected" != "$MODULE_TYPE" ]]; then
             emit "$type" "$desc" "INVALID" "MODULE_TYPE=$MODULE_TYPE but number prefix implies $expected"
             exit 0
         fi
@@ -263,7 +270,7 @@ run_self_test() {
     echo
     echo "${BOLD}Modules${NC}"
 
-    local total=0 ok=0 skipped=0 invalid=0
+    local total=0 ok=0 skipped=0 invalid=0 orphan=0
     local base type desc status reason
     while IFS= read -r module; do
         ((total++))
@@ -277,6 +284,12 @@ run_self_test() {
                 _lamp_line SKIP "$(printf '%-28s %-7s %s' "$base" "$type" "$reason")"
                 ((skipped++))
                 ;;
+            ORPHAN)
+                # Module is valid but won't run — prefix outside any phase range.
+                _lamp_line WARN "$(printf '%-28s %-7s %s' "$base" "$type" "INACTIVE — $reason")"
+                ((orphan++))
+                ((warnings++))
+                ;;
             INVALID)
                 _lamp_line FAIL "$(printf '%-28s %-7s %s' "$base" "$type" "$reason")"
                 ((invalid++))
@@ -286,8 +299,8 @@ run_self_test() {
     done < <(find "$modules_dir" -maxdepth 1 -name '*.sh' | sort)
 
     echo
-    printf '%d module(s): %d supported, %d skipped, %d invalid\n' \
-        "$total" "$ok" "$skipped" "$invalid"
+    printf '%d module(s): %d supported, %d skipped, %d orphan, %d invalid\n' \
+        "$total" "$ok" "$skipped" "$orphan" "$invalid"
 
     if (( failures > 0 )); then
         print_error "Lamp-check FAILED ($failures failure(s), $warnings warning(s))"

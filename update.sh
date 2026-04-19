@@ -4,7 +4,7 @@
 # Performs system health checks, package updates, and maintenance tasks
 
 SCRIPT_DIR="$(dirname "$(readlink -f "$0")")"
-VERSION="0.3.3"
+VERSION="0.4.0"
 
 source "$SCRIPT_DIR/utils.sh"
 source "$SCRIPT_DIR/system-check.sh"
@@ -82,7 +82,7 @@ main() {
         exit 1
     fi
 
-    run_phase "SYSTEM UPDATE MODULES" system "${ICONS[sudo]}" "[1-4][0-9]-*.sh"
+    run_phase "SYSTEM UPDATE MODULES" system "${ICONS[sudo]}" "[0-4][0-9]-*.sh"
     run_phase "USER UPDATE MODULES"   user   "${ICONS[user]}" "[5-8][0-9]-*.sh"
     run_phase "POST-UPDATE STATUS"    status "${ICONS[info]}" "9[0-9]-*.sh"
 
