@@ -77,6 +77,62 @@ upstream_commit() {
     curl -fsSL "${api_base}/commits/${ref}" 2>/dev/null | json_field sha
 }
 
+# Fetch the release body (notes) for a tag. Empty if the tag has no release
+# (e.g., UPDATE_CHANNEL=branch, or an untagged commit). Not a fatal error.
+upstream_release_body() {
+    local tag="$1"
+    [[ -z "$tag" ]] && return 0
+    local api_base="https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}"
+    # GitHub returns the body as a JSON string; extract it with python -c or
+    # a sed dance. Keep it shell-only with a minimal extractor that handles
+    # escaped newlines/quotes commonly found in release notes.
+    curl -fsSL "${api_base}/releases/tags/${tag}" 2>/dev/null \
+        | awk '
+            BEGIN { in_body = 0; depth = 0; out = "" }
+            /"body":[[:space:]]*"/ {
+                sub(/^.*"body":[[:space:]]*"/, "")
+                in_body = 1
+            }
+            in_body {
+                # Accumulate until we hit an unescaped closing quote.
+                line = $0
+                while (length(line) > 0) {
+                    c = substr(line, 1, 1)
+                    if (c == "\\" && length(line) > 1) {
+                        n = substr(line, 2, 1)
+                        if      (n == "n") out = out "\n"
+                        else if (n == "r") { }              # swallow CR
+                        else if (n == "t") out = out "\t"
+                        else if (n == "\"") out = out "\""
+                        else if (n == "\\") out = out "\\"
+                        else                 out = out n
+                        line = substr(line, 3)
+                    } else if (c == "\"") {
+                        in_body = 0
+                        line = ""
+                    } else {
+                        out = out c
+                        line = substr(line, 2)
+                    }
+                }
+            }
+            END { print out }
+        '
+}
+
+print_release_notes() {
+    local tag="$1"
+    local body
+    body=$(upstream_release_body "$tag")
+    [[ -z "$body" ]] && return 0
+
+    echo
+    print_header "${ICONS[info]} release notes: $tag"
+    # Indent for readability.
+    sed 's/^/  /' <<< "$body"
+    echo
+}
+
 # Rewrite INSTALL_MANIFEST with a new ref without re-deploying any files.
 # Used when upstream's pointer moved but the commit it points at is the
 # same one we already have installed (e.g., a release got tagged at HEAD).
@@ -127,6 +183,7 @@ do_check() {
     fi
 
     print_warning "Update available — run 'update-arch --update' to apply"
+    [[ "$UPDATE_CHANNEL" == "tag" ]] && print_release_notes "$upstream_ref"
     return 0
 }
 
@@ -338,26 +395,85 @@ do_run() {
     print_status "${ICONS[info]}" "Overwritten:  $overwritten"
     print_status "${ICONS[info]}" "Kept local:   $kept_local"
     (( skipped > 0 )) && print_warning "Skipped (unresolved): $skipped"
+
+    # Show release notes for tag-channel updates.
+    [[ "$UPDATE_CHANNEL" == "tag" ]] && print_release_notes "$upstream_ref"
+}
+
+# ---------------------------------------------------------------------------
+# --maybe-upgrade — called by update.sh before --run / --dry-run.
+# Exit codes:
+#   0  update was applied (caller should stop; don't run maintenance on a
+#      just-changed install)
+#   1  no update / user declined / check failed (caller should proceed)
+# ---------------------------------------------------------------------------
+do_maybe_upgrade() {
+    local assume_yes="${1:-no}"
+
+    read_upstream_config  || return 1
+    read_install_manifest || return 1
+    have curl             || return 1
+
+    print_status "${ICONS[sync]}" "Checking for update-arch updates..."
+
+    local upstream_ref upstream_sha
+    upstream_ref=$(upstream_latest_ref)
+    upstream_sha=$(upstream_commit "$upstream_ref")
+
+    [[ -z "$upstream_ref" || -z "$upstream_sha" ]] && return 1
+    [[ "$upstream_sha" == "$INSTALLED_COMMIT" ]] && return 1
+
+    print_warning "Update available: $INSTALLED_VERSION (${INSTALLED_COMMIT:0:7}) → $upstream_ref (${upstream_sha:0:7})"
+
+    local proceed
+    if [[ "$assume_yes" == "yes" ]]; then
+        proceed="yes"
+        print_status "${ICONS[info]}" "Non-interactive mode — applying update, then stopping."
+    else
+        echo
+        echo -n "  Update first, then stop? [Y/n]: "
+        local reply
+        read -r reply
+        case "$reply" in
+            ""|y|Y) proceed="yes" ;;
+            *)      proceed="no"  ;;
+        esac
+    fi
+
+    if [[ "$proceed" == "yes" ]]; then
+        # Pass --yes into the update itself so any conflicts don't hang a
+        # non-interactive caller. Interactive callers who hit Y here still
+        # get prompted file-by-file on conflict (assume_yes="no" below).
+        do_run "$assume_yes"
+        return 0
+    fi
+
+    print_status "${ICONS[info]}" "Continuing with current version."
+    return 1
 }
 
 main() {
     local command="" assume_yes="no"
     while (( $# > 0 )); do
         case "$1" in
-            -h|--help) show_help; exit 0 ;;
-            --check)   command="check"; shift ;;
-            --run)     command="run";   shift ;;
-            --yes|-y)  assume_yes="yes"; shift ;;
-            *)         print_error "Unknown option: $1"; show_help; exit 1 ;;
+            -h|--help)       show_help; exit 0 ;;
+            --check)         command="check"; shift ;;
+            --run)           command="run";   shift ;;
+            --maybe-upgrade) command="maybe-upgrade"; shift ;;
+            --yes|-y)        assume_yes="yes"; shift ;;
+            *)               print_error "Unknown option: $1"; show_help; exit 1 ;;
         esac
     done
 
     [[ -z "$command" ]] && { show_help; exit 0; }
 
     case "$command" in
-        check) do_check ;;
-        run)   do_run "$assume_yes" ;;
+        check)          do_check ;;
+        run)            do_run "$assume_yes" ;;
+        maybe-upgrade)  do_maybe_upgrade "$assume_yes" ;;
     esac
 }
 
-main "$@"
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    main "$@"
+fi

@@ -144,8 +144,8 @@ ${BOLD}Usage:${NC} update-arch [OPTIONS]
 ${BOLD}Options:${NC}
     ${GREEN}-h, --help${NC}              Show this help message
     ${GREEN}--version${NC}               Show version information
-    ${GREEN}--run${NC}                   Run the update process
-    ${GREEN}--dry-run${NC}               Show what would be updated without making changes
+    ${GREEN}--run [--yes]${NC}           Run the update process (--yes = auto-accept any self-upgrade)
+    ${GREEN}--dry-run [--yes]${NC}       Show what would be updated without making changes
     ${GREEN}--list${NC}                  List installed modules with their metadata
     ${GREEN}--test${NC}                  Lamp-check: verify every module is reachable and valid
     ${GREEN}--only <name>${NC}           Run a single module by name (substring match)
@@ -193,15 +193,32 @@ case "$1" in
         run_single_module "$1" 2>&1 | tee -a "${UPDATE_ARCH_CURRENT_LOG:-/dev/null}"
         exit "${PIPESTATUS[0]}"
         ;;
-    --dry-run)
-        export DRY_RUN=1
-        main
-        ;;
-    --run)
-        # Resolve the log path before the pipe so tee gets the real target.
-        setup_logging
-        main 2>&1 | tee -a "${UPDATE_ARCH_CURRENT_LOG:-/dev/null}"
-        exit "${PIPESTATUS[0]}"
+    --dry-run|--run)
+        action="$1"; shift
+        yes_flag=""
+        while (( $# > 0 )); do
+            case "$1" in
+                -y|--yes) yes_flag="--yes"; shift ;;
+                *) print_error "Unknown option: $1"; exit 1 ;;
+            esac
+        done
+
+        # Offer self-update first. If one is applied, stop — don't run
+        # maintenance on a freshly-mutated install.
+        "$SCRIPT_DIR/update-self.sh" --maybe-upgrade $yes_flag
+        case $? in
+            0) exit 0 ;;    # update applied → caller should stop
+            *) ;;           # no update / declined → proceed
+        esac
+
+        if [[ "$action" == "--dry-run" ]]; then
+            export DRY_RUN=1
+            main
+        else
+            setup_logging
+            main 2>&1 | tee -a "${UPDATE_ARCH_CURRENT_LOG:-/dev/null}"
+            exit "${PIPESTATUS[0]}"
+        fi
         ;;
     *)
         print_error "Unknown option: $1"
