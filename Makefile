@@ -9,10 +9,6 @@ DIST     := dist
 TARBALL  := $(DIST)/update-arch-$(VERSION).tar.gz
 NOTES    := $(DIST)/release-notes-$(VERSION).md
 
-# Most recent semver tag that isn't the version we're about to publish.
-# Empty on the very first release (no tags yet).
-PREV_TAG := $(shell git tag --sort=-version:refname 2>/dev/null | grep -v '^v$(VERSION)$$' | head -n 1)
-
 # Browser URL for this repo — translate git@github.com:... into https://...
 REPO_URL := $(shell git remote get-url origin 2>/dev/null | sed -E 's|git@github.com:|https://github.com/|; s|\.git$$||')
 
@@ -29,7 +25,7 @@ help:
 	@echo '  make install     Install from this working tree (./deploy.sh --install)'
 	@echo '  make uninstall   Uninstall (./deploy.sh --uninstall --yes)'
 	@echo '  make package     Build $(TARBALL) from HEAD'
-	@echo '  make notes       Generate $(NOTES) from commits since $(PREV_TAG)'
+	@echo '  make notes       Generate $(NOTES) from commits since the previous tag'
 	@echo '  make publish     Build tarball + notes, cut a GitHub release (requires gh CLI)'
 	@echo '  make clean       Remove $(DIST)/'
 	@echo ''
@@ -63,19 +59,26 @@ $(TARBALL):
 	@echo 'Created $(TARBALL)'
 
 # Always regenerate: commit set can change without the file existing.
+#
+# Fetches tags first so PREV_TAG reflects everything on the remote — gh
+# release create publishes tags to GitHub but doesn't mirror them locally,
+# so a stale working tree otherwise picks an older tag as the comparison
+# base and the notes bundle multiple versions' worth of commits.
 notes:
 	@mkdir -p $(DIST)
-	@if [ -z '$(PREV_TAG)' ]; then \
+	@git fetch --tags --quiet 2>/dev/null || true
+	@PREV=$$(git tag --sort=-version:refname 2>/dev/null | grep -v '^v$(VERSION)$$' | head -n 1); \
+	if [ -z "$$PREV" ]; then \
 		printf '# v%s\n\nInitial release.\n' '$(VERSION)' > $(NOTES); \
 	else \
 		{ \
 			printf '# v%s\n\n' '$(VERSION)'; \
-			printf '## Changes since %s\n\n' '$(PREV_TAG)'; \
-			git log '$(PREV_TAG)..HEAD' --reverse \
+			printf '## Changes since %s\n\n' "$$PREV"; \
+			git log "$$PREV..HEAD" --reverse \
 				--format='### %s%n%n%b'; \
 			printf '\n---\n\n'; \
 			printf '**Full changelog**: %s/compare/%s...v%s\n' \
-				'$(REPO_URL)' '$(PREV_TAG)' '$(VERSION)'; \
+				'$(REPO_URL)' "$$PREV" '$(VERSION)'; \
 		} > $(NOTES); \
 	fi
 	@echo 'Release notes → $(NOTES)'
