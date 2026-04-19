@@ -251,6 +251,15 @@ run_self_test() {
         ((failures++))
     fi
 
+    # git is expected on an Arch system but not required for update-arch
+    # itself to install or run. Warn if missing so the user notices.
+    if command -v git &>/dev/null; then
+        _lamp_line OK "git present: $(git --version | head -n1)"
+    else
+        _lamp_line WARN "git not installed (recommended: sudo pacman -S git)"
+        ((warnings++))
+    fi
+
     echo
     echo "${BOLD}Modules${NC}"
 

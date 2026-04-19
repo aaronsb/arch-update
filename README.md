@@ -17,16 +17,44 @@ module contract so adding your own maintenance tasks is a few lines of bash.
 
 ## Installation
 
+One-liner, no git needed on the target:
+
 ```bash
-git clone https://github.com/yourusername/arch-update.git
-cd arch-update
-./deploy.sh --install
+curl -fsSL https://raw.githubusercontent.com/aaronsb/arch-update/main/install.sh | bash
 ```
 
-The installer copies tracked git files (minus anything in `.deployignore`)
-into `$XDG_DATA_HOME/update-arch`, creates a symlink in `~/.local/bin`, and
-configures terminal preferences. Running `./deploy.sh` with no arguments
-prints help — you have to opt in to the action.
+This fetches the latest release tag as a tarball, extracts to a temp
+directory, and runs `deploy.sh --install`. Only `curl` and `tar` are
+required at install time.
+
+Prefer to read the script before piping to shell:
+
+```bash
+curl -fsSLO https://raw.githubusercontent.com/aaronsb/arch-update/main/install.sh
+less install.sh
+bash install.sh
+```
+
+### From a local clone (for development)
+
+```bash
+git clone https://github.com/aaronsb/arch-update.git
+cd arch-update
+./deploy.sh --install   # or: make install
+```
+
+Either path copies the tracked files (minus anything in `.deployignore`)
+into `$XDG_DATA_HOME/update-arch`, creates a symlink at
+`~/.local/bin/update-arch`, and writes an `INSTALL_MANIFEST` recording the
+version, commit, and source (`git` or `tarball`) for `--update` to reason
+about later.
+
+### Forking
+
+Upstream repo coordinates live in `update-arch.conf` (ships with the code,
+deployed to `$XDG_DATA_HOME/update-arch/`). A fork just edits that file.
+Users can also override by creating
+`$XDG_CONFIG_HOME/update-arch/update-arch.conf`.
 
 ## Usage
 

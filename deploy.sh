@@ -71,6 +71,21 @@ INSTALLED_REF="$RESOLVED_REF"
 EOF
 }
 
+# Record sha256 of every deployed file so uninstall can detect local edits.
+write_install_hashes() {
+    local hashfile="$UPDATE_ARCH_DATA_DIR/INSTALL_HASHES"
+    (
+        cd "$UPDATE_ARCH_DATA_DIR" || exit 1
+        # Exclude the manifest/hashes files themselves (they're written after).
+        find . -type f \
+            -not -name INSTALL_MANIFEST \
+            -not -name INSTALL_HASHES \
+            -printf '%P\n' \
+            | sort \
+            | xargs -d '\n' sha256sum 2>/dev/null
+    ) > "$hashfile"
+}
+
 check_dependencies() {
     local missing=()
     for dep in $REQUIRED_DEPS; do
@@ -106,22 +121,32 @@ is_deployignored() {
     return 1
 }
 
-get_tracked_files() {
-    if ! git rev-parse --is-inside-work-tree &>/dev/null; then
-        print_error "Not in a git repository"
-        return 1
-    fi
+get_source_files() {
     load_deployignore
     local f
-    while IFS= read -r f; do
-        [[ "$f" == .git* ]] && continue
-        is_deployignored "$f" && continue
-        echo "$f"
-    done < <(git ls-files)
+    if git rev-parse --is-inside-work-tree &>/dev/null; then
+        # Local clone: authoritative list comes from git.
+        while IFS= read -r f; do
+            [[ "$f" == .git* ]] && continue
+            is_deployignored "$f" && continue
+            echo "$f"
+        done < <(git ls-files)
+    else
+        # Tarball extract (install.sh, --update): walk the filesystem.
+        while IFS= read -r f; do
+            f="${f#./}"
+            [[ "$f" == .git* ]] && continue
+            is_deployignored "$f" && continue
+            echo "$f"
+        done < <(find . -type f -not -path './.git/*' | sort)
+    fi
 }
 
+# Legacy alias — several other helpers still call this name.
+get_tracked_files() { get_source_files; }
+
 file_hash() {
-    [[ -f "$1" ]] && git hash-object "$1" || echo "missing"
+    [[ -f "$1" ]] && sha256sum "$1" | cut -d' ' -f1 || echo "missing"
 }
 
 list_modified_files() {
@@ -314,52 +339,27 @@ ensure_path() {
 
 uninstall() {
     local assume_yes="$1"
-    if [[ "$assume_yes" != "yes" ]]; then
-        print_warning "This will remove:"
-        echo "  • Symlink:  $UPDATE_ARCH_BIN_DIR/$SCRIPT_NAME"
-        echo "  • Data:     $UPDATE_ARCH_DATA_DIR"
-        echo "  • Config:   $UPDATE_ARCH_TERMINAL_CONF"
-        echo "  (logs and cache preserved)"
-        echo
-        echo "Proceed? [y/N]"
-        local reply
-        read -r reply
-        [[ "$reply" =~ ^[Yy] ]] || { echo "Aborted"; return 1; }
+    local uninstaller
+    # Prefer the deployed uninstall.sh (which matches what was installed);
+    # fall back to the repo copy when running from a working tree.
+    if [[ -x "$UPDATE_ARCH_DATA_DIR/uninstall.sh" ]]; then
+        uninstaller="$UPDATE_ARCH_DATA_DIR/uninstall.sh"
+    elif [[ -x "./uninstall.sh" ]]; then
+        uninstaller="./uninstall.sh"
+    else
+        print_error "uninstall.sh not found"
+        return 1
     fi
 
-    print_warning "Uninstalling update-arch..."
-    local link="$UPDATE_ARCH_BIN_DIR/$SCRIPT_NAME"
-
-    [[ -L "$link" ]] && { rm "$link"; print_success "Removed symlink"; }
-
-    if [[ -d "$UPDATE_ARCH_DATA_DIR" ]]; then
-        rm -rf "$UPDATE_ARCH_DATA_DIR"
-        print_success "Removed $UPDATE_ARCH_DATA_DIR"
-    fi
-
-    if [[ -f "$UPDATE_ARCH_TERMINAL_CONF" ]]; then
-        rm -f "$UPDATE_ARCH_TERMINAL_CONF"
-        rmdir "$UPDATE_ARCH_CONFIG_DIR" 2>/dev/null || true
-        print_success "Removed terminal configuration"
-    fi
-
-    echo
-    echo "Preserved (contain user data — remove manually if desired):"
-    echo "  $UPDATE_ARCH_STATE_DIR  (run logs)"
-    echo "  $UPDATE_ARCH_CACHE_DIR  (cached backups)"
-    print_success "Uninstallation complete"
+    local args=(--run)
+    [[ "$assume_yes" == "yes" ]] && args+=(--yes)
+    exec "$uninstaller" "${args[@]}"
 }
 
 install() {
     print_header "Installing update-arch (user scope)"
 
     check_dependencies || return 1
-
-    if ! git rev-parse --is-inside-work-tree &>/dev/null; then
-        print_error "Not running from a git repository"
-        print_error "The deploy script requires a git repository to track file changes"
-        return 1
-    fi
 
     print_header "Terminal Detection"
     test_terminal_detection
@@ -374,10 +374,11 @@ install() {
     fi
 
     resolve_install_provenance
-    create_directories || return 1
-    copy_files         || return 1
+    create_directories   || return 1
+    copy_files           || return 1
+    write_install_hashes
     write_install_manifest
-    create_symlink     || return 1
+    create_symlink       || return 1
     configure_terminal_preferences
 
     local path_ok=0

@@ -6,3 +6,6 @@
 .gitignore
 TODO.md
 test-terminal.sh
+install.sh
+Makefile
+dist/*
