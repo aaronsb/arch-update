@@ -167,7 +167,7 @@ them before removing anything yourself.
 Continue? [y/N] ${NC}
 EOF
     local reply
-    read -r reply
+    read -r reply < /dev/tty
     [[ "$reply" =~ ^[Yy] ]]
 }
 

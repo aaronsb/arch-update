@@ -192,7 +192,7 @@ handle_extra_files() {
     sed 's/^/  /' <<< "$extras"
     echo
     echo "Remove these extra files? [y/N]"
-    read -r reply
+    read -r reply < /dev/tty
     case "$reply" in
         [Yy]*)
             while IFS= read -r rel; do
@@ -216,7 +216,7 @@ check_existing_deployment() {
         echo
         print_warning "Proceeding will overwrite these modifications"
         echo "Press Enter to continue or Ctrl+C to abort"
-        read -r
+        read -r < /dev/tty
     fi
     return 0
 }
@@ -247,18 +247,18 @@ EOL
     print_success "Terminal detected: $detected"
     echo
     echo "Customize terminal preferences? [y/N]"
-    read -r reply
+    read -r reply < /dev/tty
     case "$reply" in
         [Yy]*)
             echo "Force ASCII icons (no Nerd Font)? [y/N]"
-            read -r reply
+            read -r reply < /dev/tty
             [[ "$reply" =~ ^[Yy] ]] && sed -i 's/FORCE_ASCII_ICONS="false"/FORCE_ASCII_ICONS="true"/' "$UPDATE_ARCH_TERMINAL_CONF"
 
             echo "Override detected terminal? [y/N]"
-            read -r reply
+            read -r reply < /dev/tty
             if [[ "$reply" =~ ^[Yy] ]]; then
                 echo "Preferred terminal (vscode, kitty, auto, ...):"
-                read -r preferred
+                read -r preferred < /dev/tty
                 sed -i "s/PREFERRED_TERMINAL=\"auto\"/PREFERRED_TERMINAL=\"$preferred\"/" "$UPDATE_ARCH_TERMINAL_CONF"
             fi
             ;;
@@ -334,7 +334,7 @@ ensure_path() {
 
     echo "Add to ${profile:-your shell profile} now? [y/N]"
     local reply
-    read -r reply
+    read -r reply < /dev/tty
     if [[ "$reply" =~ ^[Yy] ]]; then
         [[ -z "$profile" ]] && { print_warning "Unknown shell profile; add manually"; return 1; }
         mkdir -p "$(dirname "$profile")"
