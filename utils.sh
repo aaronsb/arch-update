@@ -15,11 +15,69 @@ UPDATE_ARCH_BIN_DIR="$HOME/.local/bin"
 UPDATE_ARCH_LOG_DIR="$UPDATE_ARCH_STATE_DIR/logs"
 UPDATE_ARCH_BACKUP_DIR="$UPDATE_ARCH_CACHE_DIR/backups"
 UPDATE_ARCH_LOCK_FILE="$UPDATE_ARCH_RUNTIME_DIR/update-arch.lock"
-UPDATE_ARCH_TERMINAL_CONF="$UPDATE_ARCH_CONFIG_DIR/terminal.conf"
 UPDATE_ARCH_MANIFEST="$UPDATE_ARCH_DATA_DIR/INSTALL_MANIFEST"
 UPDATE_ARCH_UPSTREAM_CONF_NAME="update-arch.conf"
 UPDATE_ARCH_UPSTREAM_CONF_USER="$UPDATE_ARCH_CONFIG_DIR/$UPDATE_ARCH_UPSTREAM_CONF_NAME"
+# Legacy terminal config — folded into update-arch.conf at first run since 0.4.10.
+# Path retained so the migration helper can find and remove the old file.
+UPDATE_ARCH_TERMINAL_CONF_LEGACY="$UPDATE_ARCH_CONFIG_DIR/terminal.conf"
 UPDATE_ARCH_MAX_LOGS=5
+
+# ---------------------------------------------------------------------------
+# Config helpers (defined early so setup_icons → load_terminal_config can use)
+# ---------------------------------------------------------------------------
+
+# Source the layered conf files in priority order: deployed → repo-local → user.
+# Caller is responsible for resetting any vars to defaults beforehand.
+_source_user_config() {
+    local deployed="$UPDATE_ARCH_DATA_DIR/$UPDATE_ARCH_UPSTREAM_CONF_NAME"
+    local repo_local="$(dirname "${BASH_SOURCE[0]}")/$UPDATE_ARCH_UPSTREAM_CONF_NAME"
+    # shellcheck disable=SC1090
+    if   [[ -r "$deployed"   ]]; then source "$deployed"
+    elif [[ -r "$repo_local" ]]; then source "$repo_local"
+    fi
+    # shellcheck disable=SC1090
+    [[ -r "$UPDATE_ARCH_UPSTREAM_CONF_USER" ]] && source "$UPDATE_ARCH_UPSTREAM_CONF_USER"
+}
+
+# Idempotent KEY="value" upsert into a bash-sourceable conf file.
+upsert_conf_value() {
+    local file="$1" key="$2" value="$3"
+    mkdir -p "$(dirname "$file")"
+    if [[ -f "$file" ]] && grep -q "^${key}=" "$file"; then
+        # Use | as sed delimiter so paths/URLs in the value don't collide.
+        sed -i "s|^${key}=.*|${key}=\"${value}\"|" "$file"
+        return
+    fi
+    if [[ ! -s "$file" ]]; then
+        cat > "$file" << 'EOL'
+# update-arch user overrides
+# Sourced after the deployed update-arch.conf; entries here win.
+# Keys not set here fall through to the deployed defaults.
+
+EOL
+    fi
+    echo "${key}=\"${value}\"" >> "$file"
+}
+
+# Fold the deprecated terminal.conf into the unified user override file. Runs
+# once on first load after upgrading from <0.4.10; subsequent calls are no-ops.
+migrate_terminal_conf() {
+    local old="$UPDATE_ARCH_TERMINAL_CONF_LEGACY"
+    local new="$UPDATE_ARCH_UPSTREAM_CONF_USER"
+    [[ -f "$old" ]] || return 0
+
+    local line key val
+    while IFS= read -r line; do
+        [[ "$line" =~ ^([A-Z_]+)=(.*)$ ]] || continue
+        key="${BASH_REMATCH[1]}"
+        val="${BASH_REMATCH[2]}"
+        [[ "$val" =~ ^\"(.*)\"$ ]] && val="${BASH_REMATCH[1]}"
+        upsert_conf_value "$new" "$key" "$val"
+    done < "$old"
+
+    rm -f "$old"
+}
 
 # ---------------------------------------------------------------------------
 # Colors
@@ -73,15 +131,14 @@ declare -A ASCII_ICONS=(
 declare -A ICONS
 
 load_terminal_config() {
-    [[ -f "$UPDATE_ARCH_TERMINAL_CONF" ]] || return 1
-    source "$UPDATE_ARCH_TERMINAL_CONF"
+    migrate_terminal_conf
+    _source_user_config
 
-    if [[ -n "$LAST_DETECTION_TIME" ]]; then
-        local now diff
-        now=$(date +%s)
-        diff=$((now - LAST_DETECTION_TIME))
-        (( diff > 2592000 )) && return 1
-    fi
+    [[ -n "$LAST_DETECTION_TIME" ]] || return 1
+    local now diff
+    now=$(date +%s)
+    diff=$((now - LAST_DETECTION_TIME))
+    (( diff > 2592000 )) && return 1
     return 0
 }
 
@@ -382,18 +439,7 @@ read_upstream_config() {
     UPDATE_BRANCH="main"
     MIRRORS_INTERVAL_DAYS="${MIRRORS_INTERVAL_DAYS:-30}"
 
-    local deployed="$UPDATE_ARCH_DATA_DIR/$UPDATE_ARCH_UPSTREAM_CONF_NAME"
-    local repo_local="$(dirname "${BASH_SOURCE[0]}")/$UPDATE_ARCH_UPSTREAM_CONF_NAME"
-
-    # Prefer deployed, fall back to the repo-local copy (dev path).
-    # shellcheck disable=SC1090
-    if   [[ -r "$deployed"    ]]; then source "$deployed"
-    elif [[ -r "$repo_local"  ]]; then source "$repo_local"
-    fi
-
-    # User override wins.
-    # shellcheck disable=SC1090
-    [[ -r "$UPDATE_ARCH_UPSTREAM_CONF_USER" ]] && source "$UPDATE_ARCH_UPSTREAM_CONF_USER"
+    _source_user_config
 
     export MIRRORS_INTERVAL_DAYS
 

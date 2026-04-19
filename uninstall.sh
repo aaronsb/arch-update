@@ -134,10 +134,20 @@ perform_uninstall() {
         fi
     fi
 
-    if [[ -f "$UPDATE_ARCH_TERMINAL_CONF" ]]; then
-        rm -f "$UPDATE_ARCH_TERMINAL_CONF"
+    # User-override conf carries terminal prefs and any tunables (since 0.4.10).
+    # Older installs may also have a leftover terminal.conf — clean both.
+    local removed_conf=0
+    if [[ -f "$UPDATE_ARCH_UPSTREAM_CONF_USER" ]]; then
+        rm -f "$UPDATE_ARCH_UPSTREAM_CONF_USER"
+        removed_conf=1
+    fi
+    if [[ -f "$UPDATE_ARCH_TERMINAL_CONF_LEGACY" ]]; then
+        rm -f "$UPDATE_ARCH_TERMINAL_CONF_LEGACY"
+        removed_conf=1
+    fi
+    if (( removed_conf )); then
         rmdir "$UPDATE_ARCH_CONFIG_DIR" 2>/dev/null || true
-        print_success "Removed terminal configuration"
+        print_success "Removed user configuration"
     fi
 
     echo
@@ -154,7 +164,7 @@ ${YELLOW}${BOLD}This will remove the update-arch scripts from your user account.
 
 Files to be removed or reviewed:
     $UPDATE_ARCH_DATA_DIR          (scripts, modules, manifest)
-    $UPDATE_ARCH_TERMINAL_CONF     (terminal preferences)
+    $UPDATE_ARCH_UPSTREAM_CONF_USER  (user config — overrides + terminal prefs)
     $LINK         (command symlink)
 
 Preserved:

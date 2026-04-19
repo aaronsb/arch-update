@@ -19,7 +19,17 @@ else
     UPDATE_ARCH_STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/update-arch"
     UPDATE_ARCH_CACHE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/update-arch"
     UPDATE_ARCH_BIN_DIR="$HOME/.local/bin"
-    UPDATE_ARCH_TERMINAL_CONF="$UPDATE_ARCH_CONFIG_DIR/terminal.conf"
+    UPDATE_ARCH_UPSTREAM_CONF_NAME="update-arch.conf"
+    UPDATE_ARCH_UPSTREAM_CONF_USER="$UPDATE_ARCH_CONFIG_DIR/$UPDATE_ARCH_UPSTREAM_CONF_NAME"
+    upsert_conf_value() {
+        local file="$1" key="$2" value="$3"
+        mkdir -p "$(dirname "$file")"
+        if [[ -f "$file" ]] && grep -q "^${key}=" "$file"; then
+            sed -i "s|^${key}=.*|${key}=\"${value}\"|" "$file"
+        else
+            echo "${key}=\"${value}\"" >> "$file"
+        fi
+    }
 fi
 
 SCRIPT_NAME="update-arch"
@@ -232,17 +242,16 @@ create_directories() {
 }
 
 configure_terminal_preferences() {
-    local detected reply preferred
+    local detected reply preferred conf="$UPDATE_ARCH_UPSTREAM_CONF_USER"
+
     detected=$(detect_terminal)
 
-    cat > "$UPDATE_ARCH_TERMINAL_CONF" << EOL
-# Terminal configuration for update-arch
-# Last updated: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
-DETECTED_TERMINAL="$detected"
-PREFERRED_TERMINAL="auto"
-FORCE_ASCII_ICONS="false"
-LAST_DETECTION_TIME="$(date +%s)"
-EOL
+    upsert_conf_value "$conf" DETECTED_TERMINAL "$detected"
+    upsert_conf_value "$conf" LAST_DETECTION_TIME "$(date +%s)"
+    grep -q '^PREFERRED_TERMINAL=' "$conf" 2>/dev/null \
+        || upsert_conf_value "$conf" PREFERRED_TERMINAL "auto"
+    grep -q '^FORCE_ASCII_ICONS=' "$conf" 2>/dev/null \
+        || upsert_conf_value "$conf" FORCE_ASCII_ICONS "false"
 
     print_success "Terminal detected: $detected"
     echo
@@ -252,20 +261,20 @@ EOL
         [Yy]*)
             echo "Force ASCII icons (no Nerd Font)? [y/N]"
             read -r reply < /dev/tty
-            [[ "$reply" =~ ^[Yy] ]] && sed -i 's/FORCE_ASCII_ICONS="false"/FORCE_ASCII_ICONS="true"/' "$UPDATE_ARCH_TERMINAL_CONF"
+            [[ "$reply" =~ ^[Yy] ]] && upsert_conf_value "$conf" FORCE_ASCII_ICONS "true"
 
             echo "Override detected terminal? [y/N]"
             read -r reply < /dev/tty
             if [[ "$reply" =~ ^[Yy] ]]; then
                 echo "Preferred terminal (vscode, kitty, auto, ...):"
                 read -r preferred < /dev/tty
-                sed -i "s/PREFERRED_TERMINAL=\"auto\"/PREFERRED_TERMINAL=\"$preferred\"/" "$UPDATE_ARCH_TERMINAL_CONF"
+                upsert_conf_value "$conf" PREFERRED_TERMINAL "$preferred"
             fi
             ;;
     esac
 
     print_success "Terminal preferences configured"
-    print_info_box "Reconfigure anytime: update-arch --configure-terminal"
+    print_info_box "Stored in: $conf\nReconfigure anytime: update-arch --configure-terminal"
 }
 
 copy_files() {
