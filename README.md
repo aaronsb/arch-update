@@ -177,8 +177,14 @@ don't want them kept.
 
 ## Version
 
-Current version: 0.3.0. Semantic versioning.
+Current version: 0.4.12. Semantic versioning.
+
+## Contributing & architecture
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the module, deploy, and ADR workflow.
+Design decisions are recorded as ADRs under
+[`docs/architecture/`](docs/architecture/INDEX.md).
 
 ## License
 
-MIT.
+[GPL-3.0](LICENSE).

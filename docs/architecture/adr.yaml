@@ -1,0 +1,63 @@
+# ADR Configuration — arch-update
+# Defines domain numbering and validation rules.
+# Used by: docs/scripts/adr  — and the doc catalog (docs/scripts/{doc,doclint}):
+#          prose docs share these same domain bands (the "shared first octet";
+#          catalog ids are DD.NNN.P). See ADR-302.
+#
+# Full banded scheme (ADR-001 / scaffold decision):
+#   0xx  Process & Meta          (1-99)     ADR/docs practice, workflow
+#   1xx  Architecture            (100-199)  core structure, executor/frontend/store
+#   2xx  Modules & Manifest      (200-299)  step contract, manifest schema, risk class
+#   3xx  Sensing & Notification  (300-399)  pressure/harm eval, diagnostician, MOTD/toast
+#   4xx  Operations & Delivery   (400-499)  systemd, self-update, deploy, log retention
+
+project_name: arch-update
+
+domains:
+  meta:
+    range: [1, 99]
+    name: Process & Meta
+    description: ADR/docs practice, workflow, and project-management decisions
+    folder: meta
+
+  core:
+    range: [100, 199]
+    name: Architecture
+    description: Core structure — executor / frontend / run-store split, module system, IPC
+    folder: core
+
+  modules:
+    range: [200, 299]
+    name: Modules & Manifest
+    description: Step contract, manifest schema, discovery, risk classification
+    folder: modules
+
+  sensing:
+    range: [300, 399]
+    name: Sensing & Notification
+    description: Update/harm pressure evaluation, diagnostician correlation, MOTD/toast surfaces
+    folder: sensing
+
+  operations:
+    range: [400, 499]
+    name: Operations & Delivery
+    description: systemd integration, self-update, deploy/install, log retention & rotation
+    folder: operations
+
+# Valid ADR statuses
+statuses:
+  - Draft         # Initial creation, not yet proposed
+  - Proposed      # Under discussion/review
+  - Accepted      # Approved and ready for implementation
+  - Superseded    # Replaced by another ADR
+  - Deprecated    # No longer relevant
+
+# Default values for new ADRs
+defaults:
+  deciders:
+    - aaronsb
+    - claude
+  status: Draft
+
+# Viewer command for `adr view` (use {file} as placeholder)
+viewer: cat {file}
