@@ -11,7 +11,7 @@
 #   --run     Download new version, resolve conflicts interactively, apply
 #   --yes     With --run, accept-new for every conflict (non-interactive)
 
-SCRIPT_DIR="$(dirname "$(readlink -f "$0")")"
+SCRIPT_DIR="$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")"
 
 # shellcheck source=./utils.sh
 if [[ -f "$SCRIPT_DIR/utils.sh" ]]; then
@@ -184,7 +184,7 @@ do_run() {
     # -------------------------------------------------------------------
     if [[ -z "${UPDATE_ARCH_SELF_TEMP:-}" ]]; then
         local self
-        self="$(readlink -f "$0")"
+        self="$(readlink -f "${BASH_SOURCE[0]}")"
         if [[ "$self" == "$UPDATE_ARCH_DATA_DIR"/* ]]; then
             local tempdir
             tempdir=$(mktemp -d -t update-arch-self.XXXXXX)
@@ -356,6 +356,7 @@ do_run() {
 
     # Show release notes for tag-channel updates.
     [[ "$UPDATE_CHANNEL" == "tag" ]] && print_release_notes "$upstream_ref"
+    return 0
 }
 
 # ---------------------------------------------------------------------------
@@ -364,6 +365,8 @@ do_run() {
 #   0  update was applied (caller should stop; don't run maintenance on a
 #      just-changed install)
 #   1  no update / user declined / check failed (caller should proceed)
+#   2  update was attempted and did not complete (caller should stop and
+#      report; the install may be partly changed)
 # ---------------------------------------------------------------------------
 do_maybe_upgrade() {
     local assume_yes="${1:-no}"
@@ -402,7 +405,11 @@ do_maybe_upgrade() {
         # Pass --yes into the update itself so any conflicts don't hang a
         # non-interactive caller. Interactive callers who hit Y here still
         # get prompted file-by-file on conflict (assume_yes="no" below).
-        do_run "$assume_yes"
+        #
+        # Subshell: on an installed copy do_run execs a temp copy of this
+        # script, which would replace this process and take the 0/2 mapping
+        # with it. The subshell is what gets replaced.
+        ( do_run "$assume_yes" ) || return 2
         return 0
     fi
 
@@ -432,6 +439,10 @@ main() {
     esac
 }
 
+# exit inside the if: bash reads this file lazily, and a self-update may have
+# rewritten it on disk by the time main returns. Exiting from the block bash
+# has already parsed means nothing past it is read.
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
     main "$@"
+    exit $?
 fi

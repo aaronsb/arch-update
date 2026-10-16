@@ -10,8 +10,11 @@
 #   MODULE_DESCRIPTION  - one-line summary (shown in --list)
 #   MODULE_REQUIRES     - space-separated commands that must exist on PATH
 #   MODULE_DRY_RUN_SAFE - "true" | "false" (default: "true")
-#   run_update()        - required, does the actual work
+#   run_update()        - required, does the actual work; non-zero = failed
 #   check_supported()   - optional; auto-derived from MODULE_REQUIRES
+#
+# Modules may call add_run_note "text" to surface something in the end-of-run
+# summary without failing the run (a degraded system, a pending reboot).
 #
 # Lifecycle (run_module):
 #   1. Source the module in a subshell (isolates state and traps).
@@ -19,6 +22,8 @@
 #   3. Confirm run_update is defined.
 #   4. Auto-derive check_supported if the module didn't override it.
 #   5. Dispatch check_supported, then run_update.
+#   6. Return run_update's status. Unsupported and dry-run-unsafe skips
+#      return 0; load and validation errors return 1.
 
 validate_module_type() {
     local module="$1" declared="$2" expected="$3"
@@ -31,7 +36,7 @@ validate_module_type() {
 }
 
 # Map the numeric prefix (NN-name.sh) back to the expected phase name.
-# Ranges match update.sh's run_phase find patterns — keep them in sync or
+# Ranges match the patterns update.sh passes to run_phase — keep them in sync or
 # modules become orphaned (probe_module flags this as ORPHAN).
 module_expected_phase() {
     local base="$1"
@@ -103,6 +108,76 @@ run_module() {
     )
     local rc=$?
     [[ $rc -ne 0 ]] && print_warning "Module $base exited with status $rc"
+    return "$rc"
+}
+
+# Run every module in modules_dir matching pattern, in name order. A failing
+# module does not stop the phase; its status is recorded for the run summary.
+run_phase() {
+    local phase_name="$1" phase_type="$2" header_icon="$3" pattern="$4" modules_dir="$5"
+    print_header "${header_icon} ${phase_name}"
+    local module rc
+    while IFS= read -r module; do
+        rc=0
+        run_module "$module" "$phase_type" || rc=$?
+        (( rc != 0 )) && record_failure "$(basename "$module")" "$rc"
+    done < <(find "$modules_dir" -maxdepth 1 -name "$pattern" | sort)
+    return 0
+}
+
+# ---------------------------------------------------------------------------
+# Run record: what the end-of-run summary reports
+# ---------------------------------------------------------------------------
+# Failures are tracked in this shell. Notes come from modules, which run in
+# subshells, so they travel through a file named in UPDATE_ARCH_RUN_NOTES.
+
+start_run_record() {
+    RUN_FAILURES=()
+    UPDATE_ARCH_RUN_NOTES=$(mktemp "${UPDATE_ARCH_RUNTIME_DIR}/update-arch-notes.XXXXXX")
+    export UPDATE_ARCH_RUN_NOTES
+}
+
+record_failure() {
+    RUN_FAILURES+=("$1 (exit $2)")
+}
+
+# Remove the notes file. Safe to call more than once; callers run it on EXIT.
+end_run_record() {
+    [[ -n "${UPDATE_ARCH_RUN_NOTES:-}" ]] && rm -f "$UPDATE_ARCH_RUN_NOTES"
+    return 0
+}
+
+run_has_failures() {
+    (( ${#RUN_FAILURES[@]} > 0 ))
+}
+
+add_run_note() {
+    [[ -n "${UPDATE_ARCH_RUN_NOTES:-}" ]] || return 0
+    printf '%s\n' "$*" >> "$UPDATE_ARCH_RUN_NOTES"
+}
+
+# Print the summary and return 1 if any module failed.
+print_run_summary() {
+    local notes=() line
+    [[ -r "${UPDATE_ARCH_RUN_NOTES:-}" ]] && mapfile -t notes < "$UPDATE_ARCH_RUN_NOTES"
+
+    print_header "${ICONS[info]} RUN SUMMARY"
+
+    if (( ${#notes[@]} > 0 )); then
+        for line in "${notes[@]}"; do
+            print_warning "$line"
+        done
+    fi
+
+    if run_has_failures; then
+        echo -e "${RED}${BOLD}${ICONS[error]} ${#RUN_FAILURES[@]} module(s) failed:${NC}"
+        for line in "${RUN_FAILURES[@]}"; do
+            echo -e "${RED}    $line${NC}"
+        done
+        return 1
+    fi
+
+    print_success "All modules completed successfully"
     return 0
 }
 

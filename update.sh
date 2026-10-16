@@ -48,6 +48,13 @@ start_sudo_keepalive() {
     return 0
 }
 
+# The one EXIT handler: `trap ... EXIT` replaces any earlier one, so every
+# exit-time cleanup goes here.
+cleanup_run() {
+    stop_sudo_keepalive
+    end_run_record
+}
+
 stop_sudo_keepalive() {
     [[ -n "$SUDO_REFRESH_PID" ]] || return
     # Kill the subshell's children first (sleep is the long-lived one),
@@ -55,15 +62,6 @@ stop_sudo_keepalive() {
     pkill -P "$SUDO_REFRESH_PID" 2>/dev/null
     kill "$SUDO_REFRESH_PID" 2>/dev/null
     SUDO_REFRESH_PID=""
-}
-
-run_phase() {
-    local phase_name="$1" phase_type="$2" header_icon="$3" pattern="$4"
-    print_header "${header_icon} ${phase_name}"
-    local module
-    while IFS= read -r module; do
-        run_module "$module" "$phase_type"
-    done < <(find "$SCRIPT_DIR/modules" -maxdepth 1 -name "$pattern" | sort)
 }
 
 main() {
@@ -87,26 +85,33 @@ main() {
             print_status "${ICONS[info]}" "Logging to $UPDATE_ARCH_CURRENT_LOG"
     fi
 
+    start_run_record
+    trap cleanup_run EXIT
     start_sudo_keepalive || exit 1
-    trap stop_sudo_keepalive EXIT
 
     if ! check_system_health "$SCRIPT_DIR"; then
         print_error "System health checks failed"
         exit 1
     fi
 
-    run_phase "SYSTEM UPDATE MODULES" system "${ICONS[sudo]}" "[0-4][0-9]-*.sh"
-    run_phase "USER UPDATE MODULES"   user   "${ICONS[user]}" "[5-8][0-9]-*.sh"
-    run_phase "POST-UPDATE STATUS"    status "${ICONS[info]}" "9[0-9]-*.sh"
+    local modules_dir="$SCRIPT_DIR/modules"
+    run_phase "SYSTEM UPDATE MODULES" system "${ICONS[sudo]}" "[0-4][0-9]-*.sh" "$modules_dir"
+    run_phase "USER UPDATE MODULES"   user   "${ICONS[user]}" "[5-8][0-9]-*.sh" "$modules_dir"
+    run_phase "POST-UPDATE STATUS"    status "${ICONS[info]}" "9[0-9]-*.sh"      "$modules_dir"
+
+    local outcome="COMPLETED"
+    run_has_failures && outcome="FINISHED WITH FAILURES"
 
     if [[ -n "$DRY_RUN" ]]; then
         local bar="════════════════════════════════════════════════════════════════"
         echo -e "\n${MAGENTA}${BOLD}${bar}${NC}"
-        echo -e "${MAGENTA}${BOLD} ${ICONS[info]} DRY RUN COMPLETED - NO CHANGES WERE MADE ${NC}"
+        echo -e "${MAGENTA}${BOLD} ${ICONS[info]} DRY RUN ${outcome} - NO CHANGES WERE MADE ${NC}"
         echo -e "${MAGENTA}${BOLD}${bar}${NC}\n"
     else
-        print_header "${ICONS[clock]} SYSTEM UPDATE COMPLETED AT $(date)"
+        print_header "${ICONS[clock]} SYSTEM UPDATE ${outcome} AT $(date)"
     fi
+
+    print_run_summary
 }
 
 run_single_module() {
@@ -128,13 +133,17 @@ run_single_module() {
     fi
 
     # Only system modules need elevation; user/status modules run unprivileged.
+    start_run_record
+    trap cleanup_run EXIT
     if [[ "$declared_type" == "system" ]]; then
         start_sudo_keepalive || return 1
-        trap stop_sudo_keepalive EXIT
     fi
 
     print_header "${ICONS[sync]} RUNNING MODULE: $(basename "$path")"
-    run_module "$path" "$declared_type"
+    local rc=0
+    run_module "$path" "$declared_type" || rc=$?
+    (( rc != 0 )) && record_failure "$(basename "$path")" "$rc"
+    print_run_summary
 }
 
 configure_terminal() {
@@ -221,12 +230,18 @@ case "$1" in
         "$SCRIPT_DIR/update-self.sh" --maybe-upgrade $yes_flag
         case $? in
             0) exit 0 ;;    # update applied → caller should stop
+            2)              # update attempted, did not complete
+                print_error "Self-update did not complete; maintenance was not run"
+                print_status "${ICONS[info]}" "Retry with: update-arch --update"
+                exit 1
+                ;;
             *) ;;           # no update / declined → proceed
         esac
 
         if [[ "$action" == "--dry-run" ]]; then
             export DRY_RUN=1
             main
+            exit $?
         else
             setup_logging
             main 2>&1 | tee -a "${UPDATE_ARCH_CURRENT_LOG:-/dev/null}"

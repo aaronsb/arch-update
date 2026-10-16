@@ -37,6 +37,12 @@ check_supported() { ... }     # return 0 if the module can run here
 run_update()      { ... }     # the work; must honor $DRY_RUN; return 0/1
 ```
 
+A non-zero return from `run_update` is a failure: it is named in the run
+summary and makes the run exit non-zero. For something the reader should see
+that is not a failure of the module (a degraded system, a pending reboot),
+call `add_run_note "text"`; notes print in the summary and leave the exit
+status alone.
+
 Conventions:
 
 - **Honor `$DRY_RUN`** — show what *would* happen, change nothing.
