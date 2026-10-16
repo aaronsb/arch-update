@@ -1,9 +1,9 @@
 #!/bin/bash
-# Verify and repair the pacman package database.
+# Check the local pacman database for consistency problems.
 
 MODULE_TYPE="system"
 MODULE_NAME="pacman-db"
-MODULE_DESCRIPTION="Verify and repair the pacman package database"
+MODULE_DESCRIPTION="Check the pacman package database for problems"
 MODULE_REQUIRES="pacman"
 MODULE_DRY_RUN_SAFE="true"
 
@@ -15,29 +15,20 @@ run_update() {
         "The pacman database tracks installed packages\nDatabase integrity is crucial for system stability" \
         "https://wiki.archlinux.org/title/Pacman#Package_database"
 
-    local db_path="/var/lib/pacman"
-    if [[ ! -d "$db_path" ]]; then
-        print_error "Package database directory not found: $db_path"
-        return 1
-    fi
-
+    # pacman -Dk only reads the database. It reports missing dependencies and
+    # file conflicts; pacman has no automatic repair for these, so each one
+    # is a decision for the reader, and it goes to the run summary.
     print_status "${ICONS[sync]}" "Checking package database integrity..."
-    if sudo pacman -Dk &>/dev/null; then
+    local report
+    if report=$(pacman -Dk 2>&1); then
         print_success "Package database verified"
         return 0
     fi
 
-    print_warning "Package database needs repair"
-
-    if [[ -n "$DRY_RUN" ]]; then
-        print_status "${ICONS[info]}" "Would run: sudo pacman -Dk --fix"
-        return 0
-    fi
-
-    print_status "${ICONS[sync]}" "Attempting database repair..."
-    if ! sudo pacman -Dk --fix; then
-        print_error "Failed to repair package database"
-        return 1
-    fi
-    print_success "Database repaired"
+    echo "$report"
+    local problems
+    problems=$(grep -c '^error:' <<< "$report")
+    print_warning "Package database has $problems problem(s)"
+    print_info_box "Resolve each by installing the missing package or removing the conflicting one\nRe-check with: pacman -Dk"
+    add_run_note "pacman -Dk found $problems problem(s) in the package database — see its output above"
 }
