@@ -28,11 +28,14 @@ run_update() {
     local failed
     failed=$(systemctl --failed --no-legend | wc -l)
 
+    # Failed units are a finding about the system, not a failure of this
+    # module, so they go to the run summary rather than the exit status.
     if (( failed > 0 )); then
         print_warning "$failed failed systemd unit(s)"
         systemctl --failed
         print_info_box "Investigate: systemctl status <unit> | journalctl -u <unit>"
-        return 1
+        add_run_note "$failed failed systemd unit(s) — see systemctl --failed"
+        return 0
     fi
 
     print_success "All system services running normally"

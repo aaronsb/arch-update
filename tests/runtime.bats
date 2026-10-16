@@ -45,6 +45,7 @@ MODULE_TYPE=system
 MODULE_DRY_RUN_SAFE=false
 run_update() { echo RAN; }'
     DRY_RUN=1 run run_module "$MODULE_DIR/10-unsafe.sh" system
+    [ "$status" -eq 0 ]
     [[ "$output" != *RAN* ]]
     [[ "$output" == *"not dry-run safe"* ]]
 }
@@ -63,6 +64,7 @@ run_update() { echo RAN; }'
 MODULE_TYPE=system
 run_update() { return 3; }'
     run run_module "$MODULE_DIR/10-fail.sh" system
+    [ "$status" -eq 3 ]
     [[ "$output" == *"exited with status 3"* ]]
 }
 
@@ -77,4 +79,59 @@ run_update() { LEAKED=yes; echo RAN; }'
     set -e
     grep -q RAN "$BATS_TEST_TMPDIR/out"
     [ -z "${LEAKED:-}" ]
+}
+
+@test "run_phase runs every module in order and records each failure" {
+    fixture_module 10-a.sh 'MODULE_TYPE=system
+run_update() { echo A; return 1; }'
+    fixture_module 11-b.sh 'MODULE_TYPE=system
+run_update() { echo B; }'
+    fixture_module 12-c.sh 'MODULE_TYPE=system
+run_update() { echo C; return 4; }'
+    fixture_module 50-user.sh 'MODULE_TYPE=user
+run_update() { echo USER; }'
+    start_run_record
+    run_phase "SYSTEM" system "" "[0-4][0-9]-*.sh" "$MODULE_DIR" > "$BATS_TEST_TMPDIR/out"
+    set -e
+    [ "$(grep -E '^(A|B|C|USER)$' "$BATS_TEST_TMPDIR/out" | tr '\n' ' ')" = "A B C " ]
+    [ "${RUN_FAILURES[*]}" = "10-a.sh (exit 1) 12-c.sh (exit 4)" ]
+}
+
+@test "run summary on a clean run succeeds and says so" {
+    start_run_record
+    run print_run_summary
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"All modules completed successfully"* ]]
+    [[ "$output" != *failed* ]]
+}
+
+@test "run summary names failed modules and fails the run" {
+    start_run_record
+    record_failure 10-pacman-update.sh 1
+    record_failure 20-flatpak-update.sh 2
+    run print_run_summary
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"2 module(s) failed"* ]]
+    [[ "$output" == *"10-pacman-update.sh (exit 1)"* ]]
+    [[ "$output" == *"20-flatpak-update.sh (exit 2)"* ]]
+    [[ "$output" != *"completed successfully"* ]]
+}
+
+@test "notes added by a module reach the summary without failing the run" {
+    fixture_module 90-note.sh 'MODULE_TYPE=status
+run_update() { add_run_note "something to look at"; }'
+    start_run_record
+    run_phase "STATUS" status "" "9[0-9]-*.sh" "$MODULE_DIR" >/dev/null
+    run print_run_summary
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"something to look at"* ]]
+}
+
+@test "a skipped module is not a failure" {
+    fixture_module 10-skip.sh 'MODULE_TYPE=system
+MODULE_REQUIRES="definitely-not-a-command-xyz"
+run_update() { return 1; }'
+    start_run_record
+    run_phase "SYSTEM" system "" "[0-4][0-9]-*.sh" "$MODULE_DIR" >/dev/null
+    [ "${#RUN_FAILURES[@]}" -eq 0 ]
 }
