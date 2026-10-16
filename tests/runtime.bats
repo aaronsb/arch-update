@@ -72,6 +72,9 @@ MODULE_TYPE=system
 run_update() { LEAKED=yes; echo RAN; }'
     # Run in this shell, not via run or $(...), which would isolate it anyway.
     run_module "$MODULE_DIR/10-leak.sh" system > "$BATS_TEST_TMPDIR/out"
+    # A leak would include run_module's own `set +e`, which silences bats
+    # assertions; restore errexit before asserting.
+    set -e
     grep -q RAN "$BATS_TEST_TMPDIR/out"
     [ -z "${LEAKED:-}" ]
 }
