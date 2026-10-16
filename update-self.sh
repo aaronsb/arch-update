@@ -356,6 +356,7 @@ do_run() {
 
     # Show release notes for tag-channel updates.
     [[ "$UPDATE_CHANNEL" == "tag" ]] && print_release_notes "$upstream_ref"
+    return 0
 }
 
 # ---------------------------------------------------------------------------
@@ -404,7 +405,11 @@ do_maybe_upgrade() {
         # Pass --yes into the update itself so any conflicts don't hang a
         # non-interactive caller. Interactive callers who hit Y here still
         # get prompted file-by-file on conflict (assume_yes="no" below).
-        do_run "$assume_yes" || return 2
+        #
+        # Subshell: on an installed copy do_run execs a temp copy of this
+        # script, which would replace this process and take the 0/2 mapping
+        # with it. The subshell is what gets replaced.
+        ( do_run "$assume_yes" ) || return 2
         return 0
     fi
 
@@ -434,6 +439,10 @@ main() {
     esac
 }
 
+# exit inside the if: bash reads this file lazily, and a self-update may have
+# rewritten it on disk by the time main returns. Exiting from the block bash
+# has already parsed means nothing past it is read.
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
     main "$@"
+    exit $?
 fi

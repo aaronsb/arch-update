@@ -36,7 +36,7 @@ validate_module_type() {
 }
 
 # Map the numeric prefix (NN-name.sh) back to the expected phase name.
-# Ranges match update.sh's run_phase find patterns — keep them in sync or
+# Ranges match the patterns update.sh passes to run_phase — keep them in sync or
 # modules become orphaned (probe_module flags this as ORPHAN).
 module_expected_phase() {
     local base="$1"
@@ -141,18 +141,25 @@ record_failure() {
     RUN_FAILURES+=("$1 (exit $2)")
 }
 
+# Remove the notes file. Safe to call more than once; callers run it on EXIT.
+end_run_record() {
+    [[ -n "${UPDATE_ARCH_RUN_NOTES:-}" ]] && rm -f "$UPDATE_ARCH_RUN_NOTES"
+    return 0
+}
+
+run_has_failures() {
+    (( ${#RUN_FAILURES[@]} > 0 ))
+}
+
 add_run_note() {
-    [[ -n "$UPDATE_ARCH_RUN_NOTES" ]] || return 0
+    [[ -n "${UPDATE_ARCH_RUN_NOTES:-}" ]] || return 0
     printf '%s\n' "$*" >> "$UPDATE_ARCH_RUN_NOTES"
 }
 
 # Print the summary and return 1 if any module failed.
 print_run_summary() {
     local notes=() line
-    if [[ -r "$UPDATE_ARCH_RUN_NOTES" ]]; then
-        mapfile -t notes < "$UPDATE_ARCH_RUN_NOTES"
-        rm -f "$UPDATE_ARCH_RUN_NOTES"
-    fi
+    [[ -r "${UPDATE_ARCH_RUN_NOTES:-}" ]] && mapfile -t notes < "$UPDATE_ARCH_RUN_NOTES"
 
     print_header "${ICONS[info]} RUN SUMMARY"
 
@@ -162,7 +169,7 @@ print_run_summary() {
         done
     fi
 
-    if (( ${#RUN_FAILURES[@]} > 0 )); then
+    if run_has_failures; then
         echo -e "${RED}${BOLD}${ICONS[error]} ${#RUN_FAILURES[@]} module(s) failed:${NC}"
         for line in "${RUN_FAILURES[@]}"; do
             echo -e "${RED}    $line${NC}"

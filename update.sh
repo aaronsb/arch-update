@@ -48,6 +48,13 @@ start_sudo_keepalive() {
     return 0
 }
 
+# The one EXIT handler: `trap ... EXIT` replaces any earlier one, so every
+# exit-time cleanup goes here.
+cleanup_run() {
+    stop_sudo_keepalive
+    end_run_record
+}
+
 stop_sudo_keepalive() {
     [[ -n "$SUDO_REFRESH_PID" ]] || return
     # Kill the subshell's children first (sleep is the long-lived one),
@@ -78,8 +85,9 @@ main() {
             print_status "${ICONS[info]}" "Logging to $UPDATE_ARCH_CURRENT_LOG"
     fi
 
+    start_run_record
+    trap cleanup_run EXIT
     start_sudo_keepalive || exit 1
-    trap stop_sudo_keepalive EXIT
 
     if ! check_system_health "$SCRIPT_DIR"; then
         print_error "System health checks failed"
@@ -87,13 +95,12 @@ main() {
     fi
 
     local modules_dir="$SCRIPT_DIR/modules"
-    start_run_record
     run_phase "SYSTEM UPDATE MODULES" system "${ICONS[sudo]}" "[0-4][0-9]-*.sh" "$modules_dir"
     run_phase "USER UPDATE MODULES"   user   "${ICONS[user]}" "[5-8][0-9]-*.sh" "$modules_dir"
     run_phase "POST-UPDATE STATUS"    status "${ICONS[info]}" "9[0-9]-*.sh"      "$modules_dir"
 
     local outcome="COMPLETED"
-    (( ${#RUN_FAILURES[@]} > 0 )) && outcome="FINISHED WITH FAILURES"
+    run_has_failures && outcome="FINISHED WITH FAILURES"
 
     if [[ -n "$DRY_RUN" ]]; then
         local bar="════════════════════════════════════════════════════════════════"
@@ -126,13 +133,17 @@ run_single_module() {
     fi
 
     # Only system modules need elevation; user/status modules run unprivileged.
+    start_run_record
+    trap cleanup_run EXIT
     if [[ "$declared_type" == "system" ]]; then
         start_sudo_keepalive || return 1
-        trap stop_sudo_keepalive EXIT
     fi
 
     print_header "${ICONS[sync]} RUNNING MODULE: $(basename "$path")"
-    run_module "$path" "$declared_type"
+    local rc=0
+    run_module "$path" "$declared_type" || rc=$?
+    (( rc != 0 )) && record_failure "$(basename "$path")" "$rc"
+    print_run_summary
 }
 
 configure_terminal() {
