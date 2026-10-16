@@ -98,6 +98,12 @@ failing_module() {
     mkdir -p "$XDG_CONFIG_HOME/update-arch"
     echo 'UPDATE_CHANNEL="branch"' > "$XDG_CONFIG_HOME/update-arch/update-arch.conf"
     install_copy "$BATS_TEST_TMPDIR/upstream/update-arch-main"
+    # Shift every byte offset in the upstream update-self.sh. The running
+    # copy is overwritten mid-run, and anything it reads after that lands
+    # mid-line in the new file.
+    local up="$BATS_TEST_TMPDIR/upstream/update-arch-main/update-self.sh"
+    { sed -n 1p "$up"; printf '# padding\n%.0s' {1..100}; sed 1d "$up"; } > "$up.new"
+    mv "$up.new" "$up" && chmod +x "$up"
     export UPSTREAM_TARBALL="$BATS_TEST_TMPDIR/upstream.tar.gz"
     tar -czf "$UPSTREAM_TARBALL" -C "$BATS_TEST_TMPDIR/upstream" update-arch-main
     run "$INSTALL/update.sh" --run --yes < /dev/null
