@@ -11,3 +11,4 @@ Makefile
 dist/*
 tests/*
 .github/*
+modules/.shellcheckrc

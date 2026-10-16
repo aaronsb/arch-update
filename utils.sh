@@ -13,7 +13,6 @@ UPDATE_ARCH_CACHE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/update-arch"
 UPDATE_ARCH_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/tmp}"
 UPDATE_ARCH_BIN_DIR="$HOME/.local/bin"
 UPDATE_ARCH_LOG_DIR="$UPDATE_ARCH_STATE_DIR/logs"
-UPDATE_ARCH_BACKUP_DIR="$UPDATE_ARCH_CACHE_DIR/backups"
 UPDATE_ARCH_LOCK_FILE="$UPDATE_ARCH_RUNTIME_DIR/update-arch.lock"
 UPDATE_ARCH_MANIFEST="$UPDATE_ARCH_DATA_DIR/INSTALL_MANIFEST"
 UPDATE_ARCH_UPSTREAM_CONF_NAME="update-arch.conf"
@@ -31,7 +30,8 @@ UPDATE_ARCH_MAX_LOGS=5
 # Caller is responsible for resetting any vars to defaults beforehand.
 _source_user_config() {
     local deployed="$UPDATE_ARCH_DATA_DIR/$UPDATE_ARCH_UPSTREAM_CONF_NAME"
-    local repo_local="$(dirname "${BASH_SOURCE[0]}")/$UPDATE_ARCH_UPSTREAM_CONF_NAME"
+    local repo_local
+    repo_local="$(dirname "${BASH_SOURCE[0]}")/$UPDATE_ARCH_UPSTREAM_CONF_NAME"
     # shellcheck disable=SC1090
     if   [[ -r "$deployed"   ]]; then source "$deployed"
     elif [[ -r "$repo_local" ]]; then source "$repo_local"
@@ -425,6 +425,7 @@ read_install_manifest() {
     INSTALLED_COMMIT=""
     INSTALLED_AT=""
     INSTALLED_FROM=""
+    # shellcheck disable=SC2034  # read by update-self.sh
     INSTALLED_REF=""
     [[ -r "$UPDATE_ARCH_MANIFEST" ]] || return 1
     # shellcheck disable=SC1090
@@ -435,7 +436,9 @@ read_install_manifest() {
 read_upstream_config() {
     REPO_OWNER=""
     REPO_NAME=""
+    # shellcheck disable=SC2034  # read by remote.sh and update-self.sh
     UPDATE_CHANNEL="tag"
+    # shellcheck disable=SC2034  # read by remote.sh
     UPDATE_BRANCH="main"
     MIRRORS_INTERVAL_DAYS="${MIRRORS_INTERVAL_DAYS:-30}"
 

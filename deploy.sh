@@ -281,19 +281,12 @@ copy_files() {
     local tracked
     tracked=$(get_tracked_files) || return 1
 
-    local f target_dir target copied=0
+    local f target copied=0
     while IFS= read -r f; do
         [[ -z "$f" ]] && continue
         [[ ! -f "$f" ]] && continue
 
-        if [[ "$f" == modules/* ]]; then
-            target_dir="$UPDATE_ARCH_DATA_DIR/modules"
-            target="$UPDATE_ARCH_DATA_DIR/$f"
-        else
-            target_dir="$UPDATE_ARCH_DATA_DIR"
-            target="$UPDATE_ARCH_DATA_DIR/$f"
-        fi
-
+        target="$UPDATE_ARCH_DATA_DIR/$f"
         mkdir -p "$(dirname "$target")"
 
         if cp "$f" "$target"; then

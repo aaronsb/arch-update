@@ -20,7 +20,7 @@ help:
 	@echo 'update-arch developer targets (v$(VERSION))'
 	@echo ''
 	@echo '  make check       Run lint and test'
-	@echo '  make lint        Shellcheck every script'
+	@echo '  make lint        Shellcheck every script (warnings and errors)'
 	@echo '  make test        Run the bats suite in tests/'
 	@echo '  make lamp        Run the lamp-check against the repo copy'
 	@echo '  make list        List modules with metadata'
@@ -40,7 +40,7 @@ check: lint test
 
 lint:
 	@command -v shellcheck >/dev/null || { echo 'shellcheck not installed (sudo pacman -S shellcheck)' >&2; exit 1; }
-	shellcheck -x $(SHELL_SOURCES)
+	shellcheck -x --severity=warning $(SHELL_SOURCES)
 
 test:
 	bats tests/

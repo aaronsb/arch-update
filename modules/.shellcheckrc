@@ -1,0 +1,3 @@
+# Module header fields (MODULE_TYPE, MODULE_REQUIRES, ...) are read by
+# runtime.sh after it sources the module; shellcheck cannot see that use.
+disable=SC2034
