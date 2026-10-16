@@ -20,21 +20,26 @@ run_update() {
         local updates
         updates=$(checkupdates 2>/dev/null)
         local rc=$?
-        if (( rc != 0 )) && [[ -z "$updates" ]]; then
-            print_warning "Update check failed; proceeding anyway"
-        elif [[ -z "$updates" ]]; then
-            print_success "System is up to date"
-            return 0
-        else
-            print_status "${ICONS[package]}" "Updates available:"
-            echo "$updates"
-            if [[ -n "$DRY_RUN" ]]; then
-                local n
-                n=$(wc -l <<< "$updates")
-                print_status "${ICONS[info]}" "Would update $n package(s)"
+        # checkupdates: 0 = updates pending, 2 = none pending, 1 = check failed.
+        case $rc in
+            0)
+                print_status "${ICONS[package]}" "Updates available:"
+                echo "$updates"
+                if [[ -n "$DRY_RUN" ]]; then
+                    local n
+                    n=$(wc -l <<< "$updates")
+                    print_status "${ICONS[info]}" "Would update $n package(s)"
+                    return 0
+                fi
+                ;;
+            2)
+                print_success "System is up to date"
                 return 0
-            fi
-        fi
+                ;;
+            *)
+                print_warning "Update check failed; proceeding anyway"
+                ;;
+        esac
     fi
 
     [[ -n "$DRY_RUN" ]] && return 0
