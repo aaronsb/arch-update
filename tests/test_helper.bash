@@ -5,9 +5,12 @@
 # repo. Nothing touches the real system: sudo, pacman and friends resolve to
 # stubs the test writes.
 
+bats_require_minimum_version 1.5.0
+
 REPO_ROOT="$(cd "$(dirname "${BATS_TEST_FILENAME}")/.." && pwd)"
 
 common_setup() {
+    : "${BATS_TEST_TMPDIR:?tests require bats >= 1.4}"
     export HOME="$BATS_TEST_TMPDIR/home"
     export XDG_DATA_HOME="$HOME/.local/share"
     export XDG_CONFIG_HOME="$HOME/.config"
@@ -15,6 +18,7 @@ common_setup() {
     export XDG_CACHE_HOME="$HOME/.cache"
     export XDG_RUNTIME_DIR="$BATS_TEST_TMPDIR/run"
     export TERM=xterm
+    export PACMAN_DB_LOCK="$BATS_TEST_TMPDIR/db.lck"
     unset DRY_RUN TERM_PROGRAM KITTY_WINDOW_ID ALACRITTY_LOG WEZTERM_PANE
     mkdir -p "$HOME" "$XDG_RUNTIME_DIR"
 
@@ -27,11 +31,15 @@ common_setup() {
     MODULE_DIR="$BATS_TEST_TMPDIR/modules"
     mkdir -p "$MODULE_DIR"
 
-    # Pass-through sudo: drop its own flags, run the rest unprivileged.
+    # Pass-through sudo: drop its own flags and run the target unprivileged,
+    # but only if the test stubbed it. An unstubbed target never reaches the
+    # host's real binary.
     stub sudo '
 while [[ "$1" == -* ]]; do shift; done
 (( $# == 0 )) && exit 0
-exec "$@"'
+target="'"$STUB_BIN"'/$1"; shift
+[[ -x "$target" ]] || { echo "sudo stub: ${target##*/} is not stubbed" >&2; exit 127; }
+exec "$target" "$@"'
 
     # shellcheck source=../utils.sh
     source "$REPO_ROOT/utils.sh"

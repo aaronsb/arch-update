@@ -14,6 +14,7 @@ UPDATE_ARCH_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/tmp}"
 UPDATE_ARCH_BIN_DIR="$HOME/.local/bin"
 UPDATE_ARCH_LOG_DIR="$UPDATE_ARCH_STATE_DIR/logs"
 UPDATE_ARCH_LOCK_FILE="$UPDATE_ARCH_RUNTIME_DIR/update-arch.lock"
+PACMAN_DB_LOCK="${PACMAN_DB_LOCK:-/var/lib/pacman/db.lck}"
 UPDATE_ARCH_MANIFEST="$UPDATE_ARCH_DATA_DIR/INSTALL_MANIFEST"
 UPDATE_ARCH_UPSTREAM_CONF_NAME="update-arch.conf"
 UPDATE_ARCH_UPSTREAM_CONF_USER="$UPDATE_ARCH_CONFIG_DIR/$UPDATE_ARCH_UPSTREAM_CONF_NAME"
@@ -317,7 +318,7 @@ check_disk_space() {
 # up front avoids a long keyring/mirror/journal preamble that would only
 # discover the problem at the pacman -Syu step.
 check_pacman_lock() {
-    local lockfile="/var/lib/pacman/db.lck"
+    local lockfile="$PACMAN_DB_LOCK"
     print_status "${ICONS[key]}" "Checking package manager state..."
 
     if [[ ! -e "$lockfile" ]]; then

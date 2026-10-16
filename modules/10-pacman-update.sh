@@ -37,6 +37,10 @@ run_update() {
                 return 0
                 ;;
             *)
+                if [[ -n "$DRY_RUN" ]]; then
+                    print_warning "Update check failed (checkupdates exit $rc)"
+                    return 0
+                fi
                 print_warning "Update check failed; proceeding anyway"
                 ;;
         esac
@@ -44,9 +48,9 @@ run_update() {
 
     [[ -n "$DRY_RUN" ]] && return 0
 
-    if [[ -f "/var/lib/pacman/db.lck" ]]; then
+    if [[ -f "$PACMAN_DB_LOCK" ]]; then
         print_error "Package manager is locked. Another pacman operation may be in progress."
-        print_status "${ICONS[info]}" "If none is running: sudo rm /var/lib/pacman/db.lck"
+        print_status "${ICONS[info]}" "If none is running: sudo rm $PACMAN_DB_LOCK"
         return 1
     fi
 

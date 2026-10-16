@@ -14,7 +14,7 @@ setup() {
     run run_module "$MODULE" system
     [ "$status" -eq 0 ]
     [[ "$output" == *"System is up to date"* ]]
-    ! grep -q '^pacman' "$STUB_LOG"
+    run ! grep -q '^pacman' "$STUB_LOG"
 }
 
 @test "dry run counts pending updates without invoking pacman" {
@@ -22,14 +22,14 @@ setup() {
     stub pacman 'exit 0'
     DRY_RUN=1 run run_module "$MODULE" system
     [[ "$output" == *"Would update 2 package(s)"* ]]
-    ! grep -q '^pacman' "$STUB_LOG"
+    run ! grep -q '^pacman' "$STUB_LOG"
 }
 
 @test "pending updates run pacman -Syu --noconfirm" {
     stub checkupdates 'echo "foo 1-1 -> 1-2"'
     stub pacman 'exit 0'
     run run_module "$MODULE" system
-    grep -qx 'pacman -Syu --noconfirm' "$STUB_LOG"
+    grep -qx 'sudo pacman -Syu --noconfirm' "$STUB_LOG"
     [[ "$output" == *"System packages updated"* ]]
 }
 
@@ -46,5 +46,24 @@ setup() {
     stub pacman 'exit 0'
     run run_module "$MODULE" system
     [[ "$output" == *"Update check failed; proceeding anyway"* ]]
-    grep -qx 'pacman -Syu --noconfirm' "$STUB_LOG"
+    grep -qx 'sudo pacman -Syu --noconfirm' "$STUB_LOG"
+}
+
+@test "dry run with a failed update check does not proceed" {
+    stub checkupdates 'exit 1'
+    stub pacman 'exit 0'
+    DRY_RUN=1 run run_module "$MODULE" system
+    [[ "$output" == *"Update check failed (checkupdates exit 1)"* ]]
+    [[ "$output" != *"proceeding anyway"* ]]
+    run ! grep -q '^pacman' "$STUB_LOG"
+}
+
+@test "a held pacman db lock fails the module without invoking pacman" {
+    stub checkupdates 'echo "foo 1-1 -> 1-2"'
+    stub pacman 'exit 0'
+    touch "$PACMAN_DB_LOCK"
+    run run_module "$MODULE" system
+    [[ "$output" == *"Package manager is locked"* ]]
+    [[ "$output" == *"exited with status 1"* ]]
+    run ! grep -q '^pacman' "$STUB_LOG"
 }

@@ -5,6 +5,11 @@ load test_helper
 
 setup() { common_setup; }
 
+@test "the sudo stub refuses a target the test did not stub" {
+    run -127 sudo definitely-not-stubbed
+    [[ "$output" == *"not stubbed"* ]]
+}
+
 @test "phase ranges map number prefixes to module types" {
     [ "$(module_expected_phase 00-x.sh)" = system ]
     [ "$(module_expected_phase 49-x.sh)" = system ]
@@ -64,7 +69,9 @@ run_update() { return 3; }'
 @test "run_module isolates module state from the caller" {
     fixture_module 10-leak.sh '
 MODULE_TYPE=system
-run_update() { LEAKED=yes; }'
-    run_module "$MODULE_DIR/10-leak.sh" system >/dev/null
+run_update() { LEAKED=yes; echo RAN; }'
+    # Run in this shell, not via run or $(...), which would isolate it anyway.
+    run_module "$MODULE_DIR/10-leak.sh" system > "$BATS_TEST_TMPDIR/out"
+    grep -q RAN "$BATS_TEST_TMPDIR/out"
     [ -z "${LEAKED:-}" ]
 }
