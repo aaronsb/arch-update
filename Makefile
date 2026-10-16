@@ -14,12 +14,15 @@ REPO_URL := $(shell git remote get-url origin 2>/dev/null | sed -E 's|git@github
 
 .DEFAULT_GOAL := help
 
-.PHONY: help test install uninstall list version package notes publish clean
+.PHONY: help check lint test lamp install uninstall list version package notes publish clean
 
 help:
 	@echo 'update-arch developer targets (v$(VERSION))'
 	@echo ''
-	@echo '  make test        Run the lamp-check against the repo copy'
+	@echo '  make check       Run lint and test'
+	@echo '  make lint        Shellcheck every script'
+	@echo '  make test        Run the bats suite in tests/'
+	@echo '  make lamp        Run the lamp-check against the repo copy'
 	@echo '  make list        List modules with metadata'
 	@echo '  make version     Show version banner'
 	@echo '  make install     Install from this working tree (./deploy.sh --install)'
@@ -31,7 +34,18 @@ help:
 	@echo ''
 	@echo 'Run `make <target>` to execute one. Nothing runs without a target.'
 
+SHELL_SOURCES := $(wildcard *.sh) $(wildcard modules/*.sh)
+
+check: lint test
+
+lint:
+	@command -v shellcheck >/dev/null || { echo 'shellcheck not installed (sudo pacman -S shellcheck)' >&2; exit 1; }
+	shellcheck -x $(SHELL_SOURCES)
+
 test:
+	bats tests/
+
+lamp:
 	./update.sh --test
 
 list:
