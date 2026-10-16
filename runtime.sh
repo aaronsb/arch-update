@@ -57,7 +57,6 @@ run_module() {
     (
         set +e
         MODULE_TYPE=""
-        MODULE_NAME=""
         MODULE_DESCRIPTION=""
         MODULE_REQUIRES=""
         MODULE_DRY_RUN_SAFE="true"
@@ -113,7 +112,6 @@ module_metadata() {
     (
         set +e
         MODULE_TYPE=""
-        MODULE_NAME=""
         MODULE_DESCRIPTION=""
         MODULE_REQUIRES=""
         # shellcheck disable=SC1090
@@ -135,12 +133,11 @@ probe_module() {
     (
         set +e
         MODULE_TYPE=""
-        MODULE_NAME=""
         MODULE_DESCRIPTION=""
         MODULE_REQUIRES=""
         unset -f check_supported run_update 2>/dev/null
 
-        local base type desc emit
+        local base type desc
         base=$(basename "$module" .sh)
         emit() { printf '%s\t%s\t%s\t%s\t%s\n' "$base" "$1" "$2" "$3" "$4"; }
 

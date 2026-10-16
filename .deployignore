@@ -9,3 +9,6 @@ test-terminal.sh
 install.sh
 Makefile
 dist/*
+tests/*
+.github/*
+modules/.shellcheckrc
