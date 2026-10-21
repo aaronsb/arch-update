@@ -9,33 +9,44 @@ This module runs in the additional package systems range (20-29) as it handles u
 ## Purpose
 
 This module manages Flatpak package updates. It:
-- Checks if Flatpak is installed and in use
-- Lists available Flatpak updates
-- Performs package updates
+- Checks if Flatpak is installed
+- Lists available updates for the system and user installations
+- Updates each installation that has pending updates, without prompting
 - Provides clear status updates during the process
 - Handles errors gracefully with informative messages
 
 ## Requirements
 
 - flatpak package installed
-- At least one Flatpak package installed
+- At least one Flatpak package installed (system or user installation)
+- sudo, for the system installation (update-arch holds a session for the system phase)
 - Internet connection for updates
 
 ## Operation
 
 1. Verifies system requirements
-   - Checks for Flatpak installation
-   - Verifies presence of installed Flatpak packages
+   - Skips the module when `flatpak` is not installed
 
 2. Checks for updates
-   - Lists available package updates
-   - Shows pending updates if found
-   - Skips update if all packages are current
+   - Lists pending updates for the system installation (`flatpak remote-ls --updates --system`) and the user installation (`--user`)
+   - Skips the update if both are current
+   - In a dry run, lists the pending updates and changes nothing
 
-3. Performs update
-   - Updates all Flatpak packages
-   - Uses non-interactive mode (-y flag)
-   - Reports success or failure
+3. Performs the update, non-interactively (`--noninteractive`)
+   - System installation: `sudo flatpak update --system`, as root
+   - User installation: `flatpak update --user`, as the invoking user
+   - Reports success, or a failure for the installation that failed
+
+## Why the system installation goes through sudo
+
+Run as an ordinary user, `flatpak update` changes the system installation
+through flatpak's system-helper, and polkit allows that without a password
+only for a local, active session. Over SSH, from a timer, or with no
+authentication agent, `--noninteractive` cannot prompt and every deploy is
+refused (`Flatpak system operation Deploy not allowed for user`). Root needs
+no polkit authorization, and update-arch already holds a sudo session for the
+system phase. The user installation stays with the invoking user, since under
+sudo `--user` would mean root's own installation.
 
 ## Features
 
