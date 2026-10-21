@@ -4,7 +4,7 @@
 # Performs system health checks, package updates, and maintenance tasks
 
 SCRIPT_DIR="$(dirname "$(readlink -f "$0")")"
-VERSION="0.5.0"
+VERSION="0.6.0"
 
 source "$SCRIPT_DIR/utils.sh"
 source "$SCRIPT_DIR/system-check.sh"
