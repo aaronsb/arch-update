@@ -30,12 +30,13 @@ This module manages Flatpak package updates. It:
 2. Checks for updates
    - Lists pending updates for the system installation (`flatpak remote-ls --updates --system`) and the user installation (`--user`)
    - Skips the update if both are current
-   - In a dry run, lists the pending updates and changes nothing
+   - A check that fails (offline, remote unreachable) is not a module failure: it prints a warning, adds a run note ("Flatpak system updates not checked (remote-ls exit N)"), and never claims "up to date" for that installation. The other installation is still checked and updated
+   - In a dry run, lists the pending updates grouped as "system (via sudo)" and "user", and changes nothing
 
 3. Performs the update, non-interactively (`--noninteractive`)
    - System installation: `sudo flatpak update --system`, as root
    - User installation: `flatpak update --user`, as the invoking user
-   - Reports success, or a failure for the installation that failed
+   - Both installations are always attempted; a failure in one is reported and fails the module, but does not skip the other
 
 ## Why the system installation goes through sudo
 

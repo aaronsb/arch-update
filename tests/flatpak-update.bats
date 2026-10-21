@@ -6,7 +6,9 @@
 # refused, the way polkit refuses flatpak's system-helper when there is no one
 # to authenticate. The sudo stub marks its child as root so the flatpak stub
 # can tell the two apart. Updates pending per installation come from
-# SYSTEM_UPDATES and USER_UPDATES.
+# SYSTEM_UPDATES and USER_UPDATES. SYSTEM_UPDATE_RC and USER_UPDATE_RC set the
+# exit status of each installation's update, SYSTEM_LS_RC and USER_LS_RC that
+# of each installation's update check.
 
 load test_helper
 
@@ -35,22 +37,28 @@ FAKE_ROOT=1 exec "$target" "$@"'
 args=" $* "
 case "$1" in
     remote-ls)
-        [[ "$args" == *" --user "* ]] || printf "%s" "$SYSTEM_UPDATES"
-        [[ "$args" == *" --system "* ]] || printf "%s" "$USER_UPDATES"
+        if [[ "$args" == *" --user "* ]]; then
+            [[ "${USER_LS_RC:-0}" == 0 ]] || { echo "error: offline" >&2; exit "$USER_LS_RC"; }
+            printf "%s" "$USER_UPDATES"
+        else
+            [[ "${SYSTEM_LS_RC:-0}" == 0 ]] || { echo "error: offline" >&2; exit "$SYSTEM_LS_RC"; }
+            printf "%s" "$SYSTEM_UPDATES"
+        fi
         ;;
     update)
         if [[ "$args" == *" --user "* ]]; then
             [[ -z "$FAKE_ROOT" ]] || { echo "error: updated root'"'"'s user installation" >&2; exit 1; }
+            exit "${USER_UPDATE_RC:-0}"
         elif [[ -z "$FAKE_ROOT" && -n "$SYSTEM_UPDATES" ]]; then
             echo "Error: Flatpak system operation Deploy not allowed for user" >&2
             exit 1
         fi
-        exit "${FLATPAK_UPDATE_RC:-0}"
+        exit "${SYSTEM_UPDATE_RC:-0}"
         ;;
 esac
 exit 0'
 
-    export SYSTEM_UPDATES="" USER_UPDATES="" FLATPAK_UPDATE_RC=""
+    export SYSTEM_UPDATES="" USER_UPDATES="" SYSTEM_UPDATE_RC="" USER_UPDATE_RC="" SYSTEM_LS_RC="" USER_LS_RC=""
 }
 
 @test "no pending updates does not invoke flatpak update" {
@@ -98,8 +106,57 @@ exit 0'
 
 @test "a flatpak update failure is reported as a module failure" {
     SYSTEM_UPDATES=$'Slack\tcom.slack.Slack\t4.52.155\tstable\tx86_64\n'
-    FLATPAK_UPDATE_RC=1
+    SYSTEM_UPDATE_RC=1
     run run_module "$MODULE" system
     [[ "$output" == *"Failed to update the system Flatpak installation"* ]]
     [[ "$output" == *"exited with status 1"* ]]
+}
+
+@test "a system update failure still updates the user installation" {
+    SYSTEM_UPDATES=$'Slack\tcom.slack.Slack\t4.52.155\tstable\tx86_64\n'
+    USER_UPDATES=$'Signal\torg.signal.Signal\t8.29.0\tstable\tx86_64\n'
+    SYSTEM_UPDATE_RC=1
+    run run_module "$MODULE" system
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"Failed to update the system Flatpak installation"* ]]
+    grep -qx 'flatpak update --user --noninteractive' "$STUB_LOG"
+}
+
+@test "a user update failure is reported after the system installation updated" {
+    SYSTEM_UPDATES=$'Slack\tcom.slack.Slack\t4.52.155\tstable\tx86_64\n'
+    USER_UPDATES=$'Signal\torg.signal.Signal\t8.29.0\tstable\tx86_64\n'
+    USER_UPDATE_RC=1
+    run run_module "$MODULE" system
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"Failed to update the user Flatpak installation"* ]]
+    [[ "$output" != *"Failed to update the system Flatpak installation"* ]]
+    grep -qx 'sudo flatpak update --system --noninteractive' "$STUB_LOG"
+}
+
+@test "a failed update check is noted, not reported as up to date, and is not a module failure" {
+    SYSTEM_LS_RC=2
+    export UPDATE_ARCH_RUN_NOTES="$BATS_TEST_TMPDIR/notes"
+    run run_module "$MODULE" system
+    [ "$status" -eq 0 ]
+    [[ "$(cat "$UPDATE_ARCH_RUN_NOTES")" == *"Flatpak system updates not checked (remote-ls exit 2)"* ]]
+    [[ "$output" != *"up to date"* ]]
+    run ! grep -q 'flatpak update' "$STUB_LOG"
+}
+
+@test "a failed system check still checks and updates the user installation" {
+    SYSTEM_LS_RC=2
+    USER_UPDATES=$'Signal\torg.signal.Signal\t8.29.0\tstable\tx86_64\n'
+    export UPDATE_ARCH_RUN_NOTES="$BATS_TEST_TMPDIR/notes"
+    run run_module "$MODULE" system
+    [ "$status" -eq 0 ]
+    [[ "$(cat "$UPDATE_ARCH_RUN_NOTES")" == *"not checked (remote-ls exit 2)"* ]]
+    grep -qx 'flatpak update --user --noninteractive' "$STUB_LOG"
+    run ! grep -q 'flatpak update --system' "$STUB_LOG"
+}
+
+@test "dry run labels the listed updates by installation" {
+    SYSTEM_UPDATES=$'Slack\tcom.slack.Slack\t4.52.155\tstable\tx86_64\n'
+    USER_UPDATES=$'Signal\torg.signal.Signal\t8.29.0\tstable\tx86_64\n'
+    DRY_RUN=1 run run_module "$MODULE" system
+    [[ "$output" == *"system (via sudo):"*"Slack"*"user:"*"Signal"* ]]
 }

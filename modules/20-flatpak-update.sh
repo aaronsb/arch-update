@@ -24,22 +24,51 @@ run_update() {
         "https://flatpak.org/"
 
     print_status "${ICONS[sync]}" "Checking for Flatpak updates..."
-    local system_updates user_updates
-    system_updates=$(flatpak remote-ls --updates --system 2>/dev/null)
-    user_updates=$(flatpak remote-ls --updates --user 2>/dev/null)
+    # A failed check (offline, remote unreachable) says nothing about whether
+    # updates exist, so it is reported as unchecked rather than as up to date.
+    # It is not a module failure: the other installation is still checked and
+    # updated, and the run summary carries the note.
+    local system_updates user_updates check_rc unchecked=0
+    check_rc=0
+    system_updates=$(flatpak remote-ls --updates --system 2>/dev/null) || check_rc=$?
+    if (( check_rc != 0 )); then
+        system_updates=""
+        unchecked=1
+        print_warning "Could not check Flatpak system updates (remote-ls exit $check_rc)"
+        add_run_note "Flatpak system updates not checked (remote-ls exit $check_rc)"
+    fi
+    check_rc=0
+    user_updates=$(flatpak remote-ls --updates --user 2>/dev/null) || check_rc=$?
+    if (( check_rc != 0 )); then
+        user_updates=""
+        unchecked=1
+        print_warning "Could not check Flatpak user updates (remote-ls exit $check_rc)"
+        add_run_note "Flatpak user updates not checked (remote-ls exit $check_rc)"
+    fi
 
     if [[ -z "$system_updates" && -z "$user_updates" ]]; then
-        print_success "All Flatpak apps up to date"
+        (( unchecked )) || print_success "All Flatpak apps up to date"
         return 0
     fi
 
     print_status "${ICONS[package]}" "Updates available:"
     local n=0 line
-    while IFS= read -r line; do
-        [[ -n "$line" ]] || continue
-        echo "$line"
-        n=$((n + 1))
-    done <<< "${system_updates}"$'\n'"${user_updates}"
+    if [[ -n "$system_updates" ]]; then
+        echo "system (via sudo):"
+        while IFS= read -r line; do
+            [[ -n "$line" ]] || continue
+            echo "  $line"
+            n=$((n + 1))
+        done <<< "$system_updates"
+    fi
+    if [[ -n "$user_updates" ]]; then
+        echo "user:"
+        while IFS= read -r line; do
+            [[ -n "$line" ]] || continue
+            echo "  $line"
+            n=$((n + 1))
+        done <<< "$user_updates"
+    fi
 
     if [[ -n "$DRY_RUN" ]]; then
         print_status "${ICONS[info]}" "Would update $n Flatpak app(s)"
