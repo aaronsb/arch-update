@@ -111,8 +111,22 @@ run_module() {
     return "$rc"
 }
 
-# Run every module in modules_dir matching pattern, in name order. A failing
-# module does not stop the phase; its status is recorded for the run summary.
+# module_files MODULES_DIR PATTERN — paths of the modules matching PATTERN in
+# MODULES_DIR and in UPDATE_ARCH_DROPIN_DIR, ordered by file name across both,
+# so a drop-in takes its place in a phase by its number like a shipped module.
+# A glob rather than find: a drop-in, or the drop-in directory itself, is often
+# a symlink deployed by another tool.
+module_files() {
+    local modules_dir="$1" pattern="$2" dir f
+    for dir in "$modules_dir" "$UPDATE_ARCH_DROPIN_DIR"; do
+        for f in "$dir"/$pattern; do
+            [[ -f "$f" ]] && printf '%s\t%s\n' "${f##*/}" "$f"
+        done
+    done | sort | cut -f2-
+}
+
+# Run every module matching pattern, in name order. A failing module does not
+# stop the phase; its status is recorded for the run summary.
 run_phase() {
     local phase_name="$1" phase_type="$2" header_icon="$3" pattern="$4" modules_dir="$5"
     print_header "${header_icon} ${phase_name}"
@@ -121,7 +135,7 @@ run_phase() {
         rc=0
         run_module "$module" "$phase_type" || rc=$?
         (( rc != 0 )) && record_failure "$(basename "$module")" "$rc"
-    done < <(find "$modules_dir" -maxdepth 1 -name "$pattern" | sort)
+    done < <(module_files "$modules_dir" "$pattern")
     return 0
 }
 
@@ -273,8 +287,9 @@ list_modules() {
     local f name type desc
     while IFS= read -r f; do
         IFS=$'\t' read -r name type desc _ < <(module_metadata "$f")
+        [[ "$f" == "$UPDATE_ARCH_DROPIN_DIR"/* ]] && desc="(drop-in) $desc"
         printf "%-28s %-8s %s\n" "$name" "$type" "$desc"
-    done < <(find "$modules_dir" -maxdepth 1 -name "*.sh" | sort)
+    done < <(module_files "$modules_dir" "*.sh")
 }
 
 # Emit a formatted lamp-check line with status icon.
@@ -379,7 +394,7 @@ run_self_test() {
                 ((failures++))
                 ;;
         esac
-    done < <(find "$modules_dir" -maxdepth 1 -name '*.sh' | sort)
+    done < <(module_files "$modules_dir" '*.sh')
 
     echo
     printf '%d module(s): %d supported, %d skipped, %d orphan, %d invalid\n' \

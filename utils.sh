@@ -8,6 +8,8 @@
 # ---------------------------------------------------------------------------
 UPDATE_ARCH_DATA_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/update-arch"
 UPDATE_ARCH_CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/update-arch"
+# Drop-in modules: another tool claims a slot in a run by placing a module here.
+UPDATE_ARCH_DROPIN_DIR="$UPDATE_ARCH_CONFIG_DIR/modules.d"
 UPDATE_ARCH_STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/update-arch"
 UPDATE_ARCH_CACHE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/update-arch"
 UPDATE_ARCH_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/tmp}"
