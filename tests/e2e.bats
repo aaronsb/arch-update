@@ -120,3 +120,11 @@ failing_module() {
     [[ "$output" == *"look here"* ]]
     [ ! -e "$BATS_TEST_TMPDIR/victim" ]
 }
+
+@test "--only runs a drop-in module" {
+    mkdir -p "$XDG_CONFIG_HOME/update-arch/modules.d"
+    printf 'MODULE_TYPE=status\nrun_update() { echo DROPIN-RAN; }\n' > "$XDG_CONFIG_HOME/update-arch/modules.d/55-dropin.sh"
+    run "$INSTALL/update.sh" --only dropin
+    [ "$status" -eq 0 ]
+    [[ "$output" == *DROPIN-RAN* ]]
+}

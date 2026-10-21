@@ -117,7 +117,8 @@ main() {
 run_single_module() {
     local name="$1"
     local path
-    path=$(find "$SCRIPT_DIR/modules" -maxdepth 1 -name "*${name}*.sh" | head -n 1)
+    # Shipped modules and drop-ins alike; the first match in run order wins.
+    read -r path < <(module_files "$SCRIPT_DIR/modules" "*${name}*.sh") || true
     if [[ -z "$path" ]]; then
         print_error "No module matching '$name'"
         return 1

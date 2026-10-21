@@ -51,6 +51,15 @@ Conventions:
 - **Be idempotent** — running twice should be safe.
 - **Disable** a module by renaming it `*.sh.disabled`.
 
+### Drop-in modules
+
+Another tool claims a slot in a run by placing a module in `$XDG_CONFIG_HOME/update-arch/modules.d/` (typically `~/.config/update-arch/modules.d/`). A drop-in follows the same contract as a shipped module and is ordered among the shipped modules by its number, so its number picks both its phase and its position: `55-dotfiles.sh` runs in the user phase, after `50-*` and before `60-*`. `--list` marks it `(drop-in)`.
+
+- The directory belongs to the user, so installs and self-updates never touch it.
+- A drop-in or the whole directory may be a symlink, which lets a dotfiles manager deploy it.
+- A name that clashes with a shipped module runs both, the shipped one first, so pick a number the shipped modules don't use.
+- Drop-ins run while update-arch holds its sudo session, exactly like shipped modules, so only place modules you trust there.
+
 Scaffold a new module from a template:
 
 ```bash
