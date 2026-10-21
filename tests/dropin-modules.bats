@@ -89,3 +89,28 @@ run_update() { :; }'
     [[ "$output" == *"(drop-in) Claimed by another tool"* ]]
     [[ "$output" != *"(drop-in) Shipped"* ]]
 }
+
+@test "module_files orders by basename byte-wise, identically in any locale" {
+    dropin_module 50-a.sh 'MODULE_TYPE=user'
+    dropin_module 50-a-b.sh 'MODULE_TYPE=user'
+    dropin_module 50-ab.sh 'MODULE_TYPE=user'
+    local want="50-a-b.sh 50-a.sh 50-ab.sh" got
+    got=$(LC_ALL=C module_files "$MODULE_DIR" '*.sh' | xargs -n1 basename | tr '\n' ' ')
+    [ "$got" = "$want " ]
+    if locale -a 2>/dev/null | grep -qix 'en_US.utf-\?8'; then
+        got=$(LC_ALL=en_US.UTF-8 module_files "$MODULE_DIR" '*.sh' | xargs -n1 basename | tr '\n' ' ')
+        [ "$got" = "$want " ]
+    else
+        echo "en_US.UTF-8 locale not installed; skipping the locale half" >&3
+    fi
+}
+
+@test "a shipped and a drop-in module with the same name both run, shipped first" {
+    fixture_module 55-same.sh 'MODULE_TYPE=user
+run_update() { echo RAN-SHIPPED; }'
+    dropin_module 55-same.sh 'MODULE_TYPE=user
+run_update() { echo RAN-DROPIN; }'
+    run run_phase "USER" user "" "[5-8][0-9]-*.sh" "$MODULE_DIR"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *RAN-SHIPPED*RAN-DROPIN* ]]
+}

@@ -114,6 +114,8 @@ run_module() {
 # module_files MODULES_DIR PATTERN — paths of the modules matching PATTERN in
 # MODULES_DIR and in UPDATE_ARCH_DROPIN_DIR, ordered by file name across both,
 # so a drop-in takes its place in a phase by its number like a shipped module.
+# Byte-wise on the basename (locale-independent) and stable: a name clash keeps
+# the shipped module first.
 # A glob rather than find: a drop-in, or the drop-in directory itself, is often
 # a symlink deployed by another tool.
 module_files() {
@@ -122,7 +124,7 @@ module_files() {
         for f in "$dir"/$pattern; do
             [[ -f "$f" ]] && printf '%s\t%s\n' "${f##*/}" "$f"
         done
-    done | sort | cut -f2-
+    done | LC_ALL=C sort -s -t$'\t' -k1,1 | cut -f2-
 }
 
 # Run every module matching pattern, in name order. A failing module does not
