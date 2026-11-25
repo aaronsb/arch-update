@@ -163,42 +163,43 @@ use_prebuilt_modules() {
     print_success "Prebuilt NVIDIA modules installed"
 }
 
-# dkms_nvidia_version — the version of the DKMS nvidia entry, if any.
+# dkms_nvidia_versions — each version with a DKMS nvidia entry, one per line.
 # dkms status prints "nvidia/620.73.04: added" or
-# "nvidia/620.73.04, 7.3.5-arch1-1, x86_64: installed".
-dkms_nvidia_version() {
+# "nvidia/620.73.04, 7.3.5-arch1-1, x86_64: installed", one line per kernel.
+dkms_nvidia_versions() {
     command -v dkms &>/dev/null || return 0
-    dkms status nvidia 2>/dev/null | head -1 | sed -E 's|^nvidia/([^,:]+).*|\1|'
+    dkms status nvidia 2>/dev/null | sed -nE 's|^nvidia/([^,:]+).*|\1|p' | LC_ALL=C sort -u
 }
 
 dkms_source_present() {
     [[ -e "$NVIDIA_DKMS_SOURCE_ROOT/nvidia-$1/dkms.conf" ]]
 }
 
+# uses_dkms VERSION — a package ships the DKMS source for VERSION, so dkms can
+# build it.
 uses_dkms() {
-    local ver
-    ver=$(dkms_nvidia_version)
-    [[ -n "$ver" ]] && dkms_source_present "$ver"
+    command -v dkms &>/dev/null && dkms_source_present "$1"
 }
 
 # A DKMS nvidia entry whose source is gone, for instance one left "added" by a
 # killed build after nvidia-open-dkms was removed, names a module nothing can
 # build. An entry whose package still ships the source is in use and stays.
-clear_stale_dkms_entry() {
+clear_stale_dkms_entries() {
     local ver
-    ver=$(dkms_nvidia_version)
-    [[ -n "$ver" ]] || return 0
-    dkms_source_present "$ver" && return 0
+    while IFS= read -r ver; do
+        [[ -n "$ver" ]] || continue
+        dkms_source_present "$ver" && continue
 
-    if [[ -n "$DRY_RUN" ]]; then
-        print_status "${ICONS[info]}" "Would remove stale DKMS entry nvidia/$ver"
-        return 0
-    fi
-    sudo dkms remove "nvidia/$ver" --all &>/dev/null
-    if [[ -n "$(dkms_nvidia_version)" ]]; then
-        print_warning "Could not remove stale DKMS entry nvidia/$ver"
-        add_run_note "Stale DKMS entry nvidia/$ver has no source; remove it with: sudo dkms remove nvidia/$ver --all"
-    fi
+        if [[ -n "$DRY_RUN" ]]; then
+            print_status "${ICONS[info]}" "Would remove stale DKMS entry nvidia/$ver"
+            continue
+        fi
+        sudo dkms remove "nvidia/$ver" --all &>/dev/null
+        if [[ -n "$(dkms status "nvidia/$ver" 2>/dev/null)" ]]; then
+            print_warning "Could not remove stale DKMS entry nvidia/$ver"
+            add_run_note "Stale DKMS entry nvidia/$ver has no source; remove it with: sudo dkms remove nvidia/$ver --all"
+        fi
+    done < <(dkms_nvidia_versions)
 }
 
 # rebuild_dkms VERSION KVER — build the DKMS module in a transient systemd
@@ -241,7 +242,7 @@ verify_kernels() {
             continue
         fi
 
-        if uses_dkms; then
+        if uses_dkms "$ver"; then
             if [[ -n "$DRY_RUN" ]]; then
                 print_status "${ICONS[info]}" "Would build nvidia/$ver for $kver (has: ${have:-none})"
                 continue
@@ -301,7 +302,7 @@ run_update() {
     if pkg_installed nvidia-open-dkms || pkg_installed nvidia-open || pkg_installed nvidia-open-lts; then
         use_prebuilt_modules "${kernels[@]}" || failed=1
     fi
-    clear_stale_dkms_entry
+    clear_stale_dkms_entries
 
     verify_kernels "$ver" "${kernels[@]}" || failed=1
     report_loaded_driver "$ver"

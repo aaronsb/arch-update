@@ -99,7 +99,10 @@ case "$1" in
     -Q)  o=$(owner "$2") || exit 1; echo "$o $STUB_UTILS_VER" ;;
     -Si) grep -qx "$2" "$STATE/repo" ;;
     -Qu) cat "$STATE/pending" ;;
-    -Sp) shift 3; printf "%s\n" "$@"; cat "$STATE/extra-deps" ;;
+    -Sp)
+        shift
+        while [[ "$1" == -* ]]; do [[ "$1" == --print-format || "$1" == --ask ]] && shift; shift; done
+        printf "%s\n" "$@"; cat "$STATE/extra-deps" ;;
     -S)
         [[ -n "${STUB_PACMAN_S_RC:-}" ]] && exit "$STUB_PACMAN_S_RC"
         shift
@@ -123,13 +126,14 @@ cat "$STATE/modver/$2" 2>/dev/null || { echo "modinfo: ERROR: Module nvidia not 
 stub_dkms() {
     stub dkms '
 case "$1" in
-    status) cat "$STATE/dkms-status" ;;
+    status) grep "^$2[/,:]" "$STATE/dkms-status" ;;
     install)
         [[ -n "${STUB_DKMS_RC:-}" ]] && exit "$STUB_DKMS_RC"
         ver="${2#nvidia/}"; echo "$ver" > "$STATE/modver/$4" ;;
     remove)
         [[ -n "${STUB_DKMS_REMOVE_RC:-}" ]] && exit "$STUB_DKMS_REMOVE_RC"
-        : > "$STATE/dkms-status" ;;
+        grep -v "^$2[,:]" "$STATE/dkms-status" > "$STATE/dkms-status.new"
+        mv "$STATE/dkms-status.new" "$STATE/dkms-status" ;;
 esac'
 }
 
@@ -335,6 +339,34 @@ dkms_machine() {
     run run_module "$MODULE" system
     [ "$status" -eq 0 ]
     [[ "$(notes)" == *"Stale DKMS entry nvidia/620.73.04 has no source"* ]]
+}
+
+@test "a stale entry beside a live one is removed and the live one kept" {
+    nvidia_gpu
+    kernel 7.3.5-arch1-1 linux 620.73.04
+    dkms_machine
+    printf '%s\n' "nvidia/615.78.08: added" \
+        "nvidia/620.73.04, 7.3.5-arch1-1, x86_64: installed" > "$STATE/dkms-status"
+    echo 620.73.04 > "$NVIDIA_LOADED_VERSION_FILE"
+
+    run run_module "$MODULE" system
+    [ "$status" -eq 0 ]
+    [ -z "$(notes)" ]
+    grep -qx 'sudo dkms remove nvidia/615.78.08 --all' "$STUB_LOG"
+    run ! grep -q 'dkms remove nvidia/620.73.04' "$STUB_LOG"
+}
+
+@test "a live entry listed after a stale one still gets rebuilt" {
+    nvidia_gpu
+    kernel 7.3.5-zen1-1-zen linux-zen
+    dkms_machine
+    printf '%s\n' "nvidia/615.78.08: added" "nvidia/620.73.04: added" > "$STATE/dkms-status"
+    export STUB_DKMS_REMOVE_RC=1
+
+    run run_module "$MODULE" system
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"nvidia 620.73.04 (rebuilt)"* ]]
+    [[ "$(notes)" == *"Stale DKMS entry nvidia/615.78.08 has no source"* ]]
 }
 
 # --- verification ---------------------------------------------------------
