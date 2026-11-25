@@ -177,7 +177,7 @@ don't want them kept.
 
 ## Version
 
-Current version: 0.7.0. Semantic versioning.
+Current version: 0.7.1. Semantic versioning.
 
 ## Contributing & architecture
 
