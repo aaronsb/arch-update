@@ -35,6 +35,12 @@ confirm_dry_run_sudo() {
 }
 
 start_sudo_keepalive() {
+    # An account with NOPASSWD rights has no credentials to keep fresh. sudo -v
+    # can still demand a password for it: under sudo's default verifypw=all it
+    # does whenever any other rule for the user, such as %wheel, wants one.
+    if ! sudo -n -v 2>/dev/null && sudo -n true 2>/dev/null; then
+        return 0
+    fi
     sudo -v || {
         print_error "Failed to establish sudo session"
         return 1
