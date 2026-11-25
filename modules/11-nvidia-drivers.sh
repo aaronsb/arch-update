@@ -28,6 +28,8 @@ MODULE_DRY_RUN_SAFE="true"
 NVIDIA_PCI_ROOT="${NVIDIA_PCI_ROOT:-/sys/bus/pci/devices}"
 NVIDIA_MODULES_ROOT="${NVIDIA_MODULES_ROOT:-/usr/lib/modules}"
 NVIDIA_LOADED_VERSION_FILE="${NVIDIA_LOADED_VERSION_FILE:-/sys/module/nvidia/version}"
+NVIDIA_DKMS_SOURCE_ROOT="${NVIDIA_DKMS_SOURCE_ROOT:-/usr/src}"
+NVIDIA_BUILD_WAIT_LIMIT="${NVIDIA_BUILD_WAIT_LIMIT:-1800}"
 
 # An NVIDIA display controller: vendor 0x10de, PCI class 0x03xxxx (VGA, 3D,
 # display). The vendor's audio and USB functions on the same card do not count.
@@ -68,13 +70,17 @@ prebuilt_name() {
     fi
 }
 
-pkg_installed() { pacman -Qq "$1" &>/dev/null; }
+# pkg_installed NAME — NAME itself is installed. pacman -Q also answers for a
+# package that only provides NAME (nvidia-open-dkms provides nvidia-open), so
+# compare the name it prints.
+pkg_installed() { [[ "$(pacman -Qq "$1" 2>/dev/null)" == "$1" ]]; }
 pkg_in_repos()  { pacman -Si "$1" &>/dev/null; }
 
-# expected_version — the driver version nvidia-utils ships, without pkgrel.
+# expected_version — the driver version the installed userspace ships, without
+# pkgrel. Answers for nvidia-utils or a package providing it (a beta build).
 expected_version() {
     local ver
-    ver=$(pacman -Q nvidia-utils 2>/dev/null | awk '{print $2}') || return 1
+    ver=$(pacman -Q nvidia-utils 2>/dev/null | awk '{print $2}')
     [[ -n "$ver" ]] || return 1
     ver="${ver#*:}"
     echo "${ver%-*}"
@@ -116,11 +122,30 @@ use_prebuilt_modules() {
         add_run_note "No prebuilt NVIDIA module for ${missing[*]}; switch to nvidia-open-dkms to run them"
     fi
 
+    # The prebuilt packages require the repo's nvidia-utils. With a beta or
+    # other replacement userspace installed, installing them would swap it out.
+    if ! pkg_installed nvidia-utils; then
+        print_status "${ICONS[info]}" "Leaving NVIDIA packages alone: userspace is $(pacman -Qq nvidia-utils 2>/dev/null), not nvidia-utils"
+        return 0
+    fi
+
     # Installing new packages against a sync database that has updates pending
     # is a partial upgrade. Leave the switch for a run where pacman is current.
-    if [[ -n "$(pacman -Qu 2>/dev/null)" ]]; then
+    # Packages held back by IgnorePkg stay pending on purpose and do not count.
+    if [[ -n "$(pacman -Qu 2>/dev/null | grep -v '\[ignored\]$')" ]]; then
         print_warning "System has pending upgrades; not switching NVIDIA packages this run"
         add_run_note "NVIDIA prebuilt switch skipped: upgrade the system first (pacman -Syu)"
+        return 0
+    fi
+
+    # --ask 4 accepts every conflict in the transaction, not only
+    # nvidia-open-dkms. Go ahead only when the transaction installs exactly the
+    # wanted packages, so no dependency can pull in a conflict of its own.
+    local planned
+    planned=$(pacman -Sp --print-format '%n' "${wanted[@]}" 2>/dev/null | LC_ALL=C sort)
+    if [[ "$planned" != "$(printf '%s\n' "${wanted[@]}")" ]]; then
+        print_warning "Installing ${wanted[*]} would also change other packages; not switching"
+        add_run_note "NVIDIA prebuilt switch skipped: installing ${wanted[*]} brings in other packages; review with pacman -Sp ${wanted[*]}"
         return 0
     fi
 
@@ -138,38 +163,67 @@ use_prebuilt_modules() {
     print_success "Prebuilt NVIDIA modules installed"
 }
 
-# The DKMS tree can keep an nvidia entry after nvidia-open-dkms is gone, for
-# instance one left "added" by a killed build. dkms status then names a module
-# with no source behind it.
-clear_stale_dkms_entry() {
+# dkms_nvidia_version — the version of the DKMS nvidia entry, if any.
+# dkms status prints "nvidia/620.73.04: added" or
+# "nvidia/620.73.04, 7.3.5-arch1-1, x86_64: installed".
+dkms_nvidia_version() {
     command -v dkms &>/dev/null || return 0
-    pkg_installed nvidia-open-dkms && return 0
-    local entry ver
-    entry=$(dkms status nvidia 2>/dev/null | head -1)
-    [[ -n "$entry" ]] || return 0
-    ver=$(sed -E 's|^nvidia/([^,:]+).*|\1|' <<< "$entry")
+    dkms status nvidia 2>/dev/null | head -1 | sed -E 's|^nvidia/([^,:]+).*|\1|'
+}
+
+dkms_source_present() {
+    [[ -e "$NVIDIA_DKMS_SOURCE_ROOT/nvidia-$1/dkms.conf" ]]
+}
+
+uses_dkms() {
+    local ver
+    ver=$(dkms_nvidia_version)
+    [[ -n "$ver" ]] && dkms_source_present "$ver"
+}
+
+# A DKMS nvidia entry whose source is gone, for instance one left "added" by a
+# killed build after nvidia-open-dkms was removed, names a module nothing can
+# build. An entry whose package still ships the source is in use and stays.
+clear_stale_dkms_entry() {
+    local ver
+    ver=$(dkms_nvidia_version)
+    [[ -n "$ver" ]] || return 0
+    dkms_source_present "$ver" && return 0
+
     if [[ -n "$DRY_RUN" ]]; then
         print_status "${ICONS[info]}" "Would remove stale DKMS entry nvidia/$ver"
         return 0
     fi
-    sudo dkms remove "nvidia/$ver" --all &>/dev/null || true
+    sudo dkms remove "nvidia/$ver" --all &>/dev/null
+    if [[ -n "$(dkms_nvidia_version)" ]]; then
+        print_warning "Could not remove stale DKMS entry nvidia/$ver"
+        add_run_note "Stale DKMS entry nvidia/$ver has no source; remove it with: sudo dkms remove nvidia/$ver --all"
+    fi
 }
 
 # rebuild_dkms VERSION KVER — build the DKMS module in a transient systemd
 # unit. The unit is not in the terminal's session, so closing the terminal or
 # a Ctrl-C does not stop the compile partway, and it finishes even if this
-# run is killed.
+# run is killed. dkms runs depmod itself when it is not given --no-depmod, so
+# the module is indexed inside the same unit.
 rebuild_dkms() {
-    local ver="$1" kver="$2"
-    print_status "${ICONS[package]}" "Building nvidia/$ver for $kver (DKMS)..."
-    sudo systemd-run --quiet --wait --pipe --collect \
-        --unit="update-arch-dkms-nvidia-${kver//[^A-Za-z0-9]/-}" \
-        dkms install --no-depmod "nvidia/$ver" -k "$kver" || return 1
-    sudo depmod -a "$kver"
-}
+    local ver="$1" kver="$2" waited=0
+    local unit="update-arch-dkms-nvidia-${kver//[^A-Za-z0-9]/-}"
 
-uses_dkms() {
-    command -v dkms &>/dev/null && [[ -n "$(dkms status nvidia 2>/dev/null)" ]]
+    # A unit started by an earlier run that was killed may still be compiling.
+    while systemctl is-active --quiet "$unit"; do
+        (( waited == 0 )) && print_status "${ICONS[info]}" "Waiting for an earlier build ($unit) to finish..."
+        if (( waited >= NVIDIA_BUILD_WAIT_LIMIT )); then
+            print_warning "$unit is still running after ${NVIDIA_BUILD_WAIT_LIMIT}s"
+            return 1
+        fi
+        sleep 10
+        waited=$((waited + 10))
+    done
+
+    print_status "${ICONS[package]}" "Building nvidia/$ver for $kver (DKMS)..."
+    sudo systemd-run --quiet --wait --pipe --collect --unit="$unit" \
+        dkms install "nvidia/$ver" -k "$kver"
 }
 
 # verify_kernels VERSION KERNEL... — every kernel has an nvidia module at
@@ -246,8 +300,8 @@ run_update() {
     # builds (nvidia-dkms, nvidia-580xx-dkms) are verified but left alone.
     if pkg_installed nvidia-open-dkms || pkg_installed nvidia-open || pkg_installed nvidia-open-lts; then
         use_prebuilt_modules "${kernels[@]}" || failed=1
-        clear_stale_dkms_entry
     fi
+    clear_stale_dkms_entry
 
     verify_kernels "$ver" "${kernels[@]}" || failed=1
     report_loaded_driver "$ver"

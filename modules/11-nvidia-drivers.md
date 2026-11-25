@@ -31,11 +31,14 @@ DKMS is still the right choice for kernels Arch builds no NVIDIA package for, su
 2. **Expected version:** the version of the installed `nvidia-utils`, without the package release. Without `nvidia-utils` the module reports nothing to check.
 3. **Kernels:** each `/usr/lib/modules/<version>/pkgbase` names a kernel package. A directory with no `pkgbase`, left behind by a removed kernel, is ignored.
 4. **Prebuilt switch** (open driver only): for each kernel, the package `nvidia-open` (`linux`) or `nvidia-open-<suffix>` (`linux-<suffix>`). Missing ones that exist in the repos are installed with `pacman -S --needed --noconfirm --ask 4`, which also removes `nvidia-open-dkms`.
+   - Package checks compare exact names. `nvidia-open-dkms` provides `nvidia-open`, so `pacman -Q nvidia-open` answers with `nvidia-open-dkms` on a DKMS machine.
    - If any kernel has no prebuilt package and `nvidia-open-dkms` is installed, the machine stays on DKMS.
-   - If `pacman -Qu` lists pending upgrades, the switch waits for a run where the system is current, because installing against a stale sync database is a partial upgrade.
-   - A DKMS `nvidia` entry left after the switch (for example one stuck at `added` by a killed build) is removed.
-5. **Verify:** `modinfo -k <version> -F version nvidia` for every kernel. A DKMS module that is missing or at the wrong version is rebuilt with `dkms install --no-depmod` inside a transient unit (`systemd-run --wait --pipe`), followed by `depmod -a`. The unit is outside the terminal's session, so a hangup or Ctrl-C cannot stop the compile partway.
-6. **Loaded driver:** compares `/sys/module/nvidia/version` with the expected version and adds a reboot note when they differ or no driver is loaded.
+   - If the userspace is a replacement for `nvidia-utils` (a beta build, for example), the packages are left alone. The prebuilt modules require the repo's `nvidia-utils` and would swap it in.
+   - If `pacman -Qu` lists pending upgrades, the switch waits for a run where the system is current, because installing against a stale sync database is a partial upgrade. Packages held back by `IgnorePkg` don't count.
+   - `--ask 4` accepts every conflict in the transaction, so the switch runs only when `pacman -Sp` shows the transaction installs exactly the wanted packages and no other dependency.
+5. **Stale DKMS entry:** an `nvidia` entry in `dkms status` whose source (`/usr/src/nvidia-<version>/dkms.conf`) is gone is removed with `dkms remove --all`. An entry whose package still ships the source, such as an AUR beta driver, is in use and stays. If the removal fails, a run note gives the command.
+6. **Verify:** `modinfo -k <version> -F version nvidia` for every kernel. A DKMS module that is missing or at the wrong version is rebuilt with `dkms install` inside a transient unit (`systemd-run --wait --pipe`). dkms runs `depmod` itself inside the same unit, so the module is indexed even if the terminal closes during the build. The unit is outside the terminal's session, so a hangup or Ctrl-C cannot stop the compile partway. If a unit from an earlier, interrupted run is still building, the module waits for it, up to 30 minutes.
+7. **Loaded driver:** compares `/sys/module/nvidia/version` with the expected version and adds a reboot note when they differ or no driver is loaded.
 
 The proprietary and legacy drivers (`nvidia-dkms`, AUR `nvidia-580xx-dkms`) are verified and rebuilt but never switched.
 
@@ -46,7 +49,7 @@ The proprietary and legacy drivers (`nvidia-dkms`, AUR `nvidia-580xx-dkms`) are 
 
 ## Error Handling
 - The module fails when any installed kernel ends the run without an `nvidia` module at the expected version, or when the prebuilt install fails. The summary names the kernel: booting it leaves the GPU without a driver.
-- A skipped switch (pending upgrades, a kernel with no prebuilt package) is a run note, not a failure.
+- A skipped switch (pending upgrades, a kernel with no prebuilt package, a transaction that would bring in other packages) is a run note, not a failure.
 - A needed reboot is a run note.
 
 ## Related Documentation
